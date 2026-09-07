@@ -12,9 +12,24 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models.entities import ChunkMeta, Document, IngestStatus
 from app.services.embeddings import get_embeddings
-from app.services.qdrant_store import upsert_chunks
+from app.services.qdrant_store import delete_by_document, upsert_chunks
 
 logger = logging.getLogger(__name__)
+
+# Prefer section / bullet boundaries for KB docs (e.g. 了解山东师范大学)
+_SEPARATORS = [
+    "\n【",
+    "\n## ",
+    "\n### ",
+    "\n##### ",
+    "\n\n",
+    "\n- ",
+    "\n",
+    "。",
+    "；",
+    " ",
+    "",
+]
 
 
 def _load_docs(path: Path):
@@ -25,15 +40,23 @@ def _load_docs(path: Path):
         try:
             return Docx2txtLoader(str(path)).load()
         except Exception:
-            # python-docx fallback via Unstructured not required; try TextLoader
             from docx import Document as DocxDocument
+            from langchain_core.documents import Document as LCDocument
 
             doc = DocxDocument(str(path))
             text = "\n".join(p.text for p in doc.paragraphs)
-            from langchain_core.documents import Document as LCDocument
-
             return [LCDocument(page_content=text, metadata={"source": str(path)})]
     return TextLoader(str(path), encoding="utf-8").load()
+
+
+def _build_splitter():
+    settings = get_settings()
+    return RecursiveCharacterTextSplitter(
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
+        separators=_SEPARATORS,
+        keep_separator=True,
+    )
 
 
 def process_document(db: Session, document_id: str) -> None:
@@ -49,14 +72,17 @@ def process_document(db: Session, document_id: str) -> None:
     try:
         path = Path(doc.storage_path)
         loaded = _load_docs(path)
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=settings.chunk_size,
-            chunk_overlap=settings.chunk_overlap,
-        )
+        splitter = _build_splitter()
         chunks = splitter.split_documents(loaded)
         texts = [c.page_content.strip() for c in chunks if c.page_content.strip()]
         if not texts:
             raise ValueError("no text extracted from document")
+
+        # replace prior vectors for this document (re-ingest / finer split)
+        try:
+            delete_by_document(doc.id, doc.tenant_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("qdrant delete skipped: %s", exc)
 
         embeddings = get_embeddings()
         vectors = embeddings.embed_documents(texts)
@@ -69,7 +95,6 @@ def process_document(db: Session, document_id: str) -> None:
             filename=doc.filename,
         )
 
-        # replace old chunk meta
         db.query(ChunkMeta).filter(ChunkMeta.document_id == doc.id).delete()
         for i, (pid, text) in enumerate(zip(point_ids, texts, strict=True)):
             db.add(

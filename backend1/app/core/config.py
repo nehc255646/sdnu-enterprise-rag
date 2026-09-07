@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     openai_api_base: str | None = None
     openai_embedding_model: str = "text-embedding-3-small"
 
-    chunk_size: int = 800
-    chunk_overlap: int = 120
+    chunk_size: int = 320
+    chunk_overlap: int = 48
     upload_dir: str = "./data/uploads"
 
 
