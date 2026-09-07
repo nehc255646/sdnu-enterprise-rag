@@ -2,7 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, Select, Space, Table, Tag, Upload, message, Typography } from 'antd'
 import { UploadOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { listDocuments, uploadDocument } from '../api/documents'
+import {
+  ALLOWED_UPLOAD_EXT,
+  MAX_UPLOAD_BYTES,
+  SYNC_THRESHOLD_BYTES,
+  listDocuments,
+  uploadDocument,
+  validateUploadFile,
+} from '../api/documents'
 import type { DocumentListItem } from '../types'
 
 const statusColor: Record<string, string> = {
@@ -77,11 +84,23 @@ export default function DocumentsPage() {
           <Button icon={<ReloadOutlined />} onClick={() => void refresh()}>刷新</Button>
           <Upload
             showUploadList={false}
+            accept={ALLOWED_UPLOAD_EXT.join(',')}
             beforeUpload={async (file) => {
+              const f = file as File
+              const err = validateUploadFile(f)
+              if (err) {
+                message.error(err)
+                return false
+              }
               setUploading(true)
               try {
-                await uploadDocument(file as File, docType || 'kb', true)
-                message.success('上传并入库成功')
+                const sync = f.size <= SYNC_THRESHOLD_BYTES
+                const res = await uploadDocument(f, docType || 'kb', sync)
+                message.success(sync ? '上传并同步入库成功' : '已提交异步入库，稍后刷新查看状态')
+                if (!sync && res?.document_id) {
+                  // soft refresh soon for async jobs
+                  setTimeout(() => { void refresh() }, 1500)
+                }
                 await refresh()
               } catch (e) {
                 message.error(e instanceof Error ? e.message : '上传失败')
@@ -97,7 +116,8 @@ export default function DocumentsPage() {
       }
     >
       <Typography.Paragraph type="secondary">
-        对接后端1 GET /api/v1/documents 与 POST /api/v1/ingest，请求头带 X-Tenant-Id。
+        支持 {ALLOWED_UPLOAD_EXT.join(' / ')}，最大 {Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}MB；
+        超过 {Math.round(SYNC_THRESHOLD_BYTES / 1024 / 1024)}MB 走异步入库（sync=false），避免卡住界面。
       </Typography.Paragraph>
       <Table
         rowKey="document_id"

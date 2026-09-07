@@ -41,3 +41,15 @@ export type SessionOut = {
   created_at?: string | null
   updated_at?: string | null
 }
+
+export type MessageOut = {
+  id: string
+  role: string
+  content: string
+  citations_json?: string | null
+  created_at?: string | null
+}
+
+export type SessionWithMessages = SessionOut & {
+  messages: MessageOut[]
+}

@@ -24,6 +24,19 @@ export function clearAuth() {
   localStorage.removeItem(AUTH_KEY)
 }
 
+function redirectToLogin() {
+  clearAuth()
+  if (typeof window === 'undefined') return
+  const path = window.location.pathname
+  if (!path.startsWith('/login')) {
+    window.location.assign('/login')
+  }
+}
+
+export function handleUnauthorized(status: number) {
+  if (status === 401) redirectToLogin()
+}
+
 function authHeaders(extra?: HeadersInit): Headers {
   const h = new Headers(extra)
   const auth = loadAuth()
@@ -48,6 +61,10 @@ export async function chatFetch(path: string, init: RequestInit = {}) {
     headers.set('Content-Type', 'application/json')
   }
   const res = await fetch(`${CHAT_BASE}${path}`, { ...init, headers })
+  if (res.status === 401) {
+    handleUnauthorized(401)
+    throw new Error('未登录或登录已过期')
+  }
   if (!res.ok) throw new Error(await parseError(res))
   if (res.status === 204) return null
   const ct = res.headers.get('content-type') || ''
@@ -58,6 +75,10 @@ export async function chatFetch(path: string, init: RequestInit = {}) {
 export async function ingestFetch(path: string, init: RequestInit = {}) {
   const headers = authHeaders(init.headers)
   const res = await fetch(`${INGEST_BASE}${path}`, { ...init, headers })
+  if (res.status === 401) {
+    handleUnauthorized(401)
+    throw new Error('未登录或登录已过期')
+  }
   if (!res.ok) throw new Error(await parseError(res))
   return res.json()
 }
