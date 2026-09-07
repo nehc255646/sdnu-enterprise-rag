@@ -2,53 +2,63 @@ import { useEffect, useState } from 'react'
 import { Card, Space, Typography, theme, Form, Input, Button, Descriptions, Tag, message, Divider } from 'antd'
 import { CheckOutlined, ReloadOutlined } from '@ant-design/icons'
 import { ACCENT_PRESETS, useThemeAccent } from '../theme/ThemeContext'
-import { fetchHealth, updateLlmConfig, type HealthResponse } from '../api/health'
-import { useAuth } from '../auth/AuthContext'
+import {
+  fetchHealth,
+  fetchLlmConfig,
+  updateLlmConfig,
+  type HealthResponse,
+  type LlmConfigResponse,
+} from '../api/health'
 
 export default function SettingsPage() {
   const { accent, setAccent } = useThemeAccent()
   const { token } = theme.useToken()
-  const { auth } = useAuth()
   const [health, setHealth] = useState<HealthResponse | null>(null)
-  const [loadingHealth, setLoadingHealth] = useState(false)
+  const [llm, setLlm] = useState<LlmConfigResponse | null>(null)
+  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
 
-  async function loadHealth() {
-    setLoadingHealth(true)
+  async function refresh() {
+    setLoading(true)
     try {
-      const h = await fetchHealth()
+      const [h, c] = await Promise.all([fetchHealth(), fetchLlmConfig()])
       setHealth(h)
+      setLlm(c)
       form.setFieldsValue({
-        base_url: h.llm_base_url || 'http://127.0.0.1:11434/v1',
-        model: h.llm_model || '',
-        api_key: '',
+        base_url: c.base_url || h.llm_base_url || 'http://127.0.0.1:11434/v1',
+        model: c.model || h.llm_model || '',
+        api_key: undefined,
       })
     } catch (e) {
-      message.error(e instanceof Error ? e.message : 'health 拉取失败')
+      message.error(e instanceof Error ? e.message : '加载配置失败')
     } finally {
-      setLoadingHealth(false)
+      setLoading(false)
     }
   }
 
-  useEffect(() => { void loadHealth() }, [])
+  useEffect(() => { void refresh() }, [])
 
-  async function onSaveLlm(v: { base_url: string; model: string; api_key?: string }) {
+  async function onSaveLlm(v: { base_url: string; model: string; api_key?: string }, clearKey = false) {
     setSaving(true)
     try {
-      await updateLlmConfig(
-        { base_url: v.base_url, model: v.model, api_key: v.api_key || 'sk-no-auth' },
-        auth?.access_token,
-        auth?.tenant_id,
-      )
-      message.success('已切换主模型，正在刷新 health')
-      await loadHealth()
-    } catch (e) {
-      if (e instanceof Error && e.message === 'LLM_CONFIG_API_MISSING') {
-        message.warning('后端暂无 PUT /api/v1/llm/config，当前只能改 env 后重启 :8002；表单已就绪，接口一到即可切')
-      } else {
-        message.error(e instanceof Error ? e.message : '保存失败')
+      const payload: { base_url: string; model: string; api_key?: string } = {
+        base_url: v.base_url,
+        model: v.model,
       }
+      if (clearKey) {
+        payload.api_key = ''
+      } else if (typeof v.api_key === 'string' && v.api_key.length > 0) {
+        payload.api_key = v.api_key
+      }
+      const updated = await updateLlmConfig(payload)
+      setLlm(updated)
+      message.success('主模型已切换')
+      const h = await fetchHealth()
+      setHealth(h)
+      form.setFieldValue('api_key', undefined)
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '保存失败')
     } finally {
       setSaving(false)
     }
@@ -93,18 +103,21 @@ export default function SettingsPage() {
 
       <Card
         title="主模型（OpenAI 兼容）"
-        extra={<Button icon={<ReloadOutlined />} loading={loadingHealth} onClick={() => void loadHealth()}>刷新 health</Button>}
+        extra={<Button icon={<ReloadOutlined />} loading={loading} onClick={() => void refresh()}>刷新</Button>}
       >
         <Typography.Paragraph type="secondary">
-          对齐 Nehchat / Neharness：`base_url` + `api_key` + `model`。本地 Ollama 可用 `http://127.0.0.1:11434/v1`，无鉴权填 `sk-no-auth`。
+          对齐 Nehchat / Neharness。`api_key` 留空不提交=保持原值；主动清空提交空串=切成 `sk-no-auth`。
         </Typography.Paragraph>
 
         <Descriptions size="small" column={1} bordered style={{ marginBottom: 16 }}>
           <Descriptions.Item label="health">
             {health ? <Tag color={health.status === 'ok' ? 'success' : 'warning'}>{health.status}</Tag> : '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="llm_base_url">{health?.llm_base_url || '-'}</Descriptions.Item>
-          <Descriptions.Item label="llm_model">{health?.llm_model || '-'}</Descriptions.Item>
+          <Descriptions.Item label="llm_base_url">{health?.llm_base_url || llm?.base_url || '-'}</Descriptions.Item>
+          <Descriptions.Item label="llm_model">{health?.llm_model || llm?.model || '-'}</Descriptions.Item>
+          <Descriptions.Item label="api_key_set">
+            {llm ? (llm.api_key_set ? <Tag color="blue">已设置</Tag> : <Tag>sk-no-auth / 空</Tag>) : '-'}
+          </Descriptions.Item>
           <Descriptions.Item label="embedding">
             {(health?.embedding_provider || '-') + ' / ' + (health?.embedding_model || '-')}
           </Descriptions.Item>
@@ -113,17 +126,37 @@ export default function SettingsPage() {
 
         <Divider />
 
-        <Form form={form} layout="vertical" onFinish={(v) => void onSaveLlm(v)}>
-          <Form.Item name="base_url" label="OPENAI_BASE_URL / base_url" rules={[{ required: true }]}>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={(v) => void onSaveLlm(v)}
+          initialValues={{ base_url: 'http://127.0.0.1:11434/v1' }}
+        >
+          <Form.Item name="base_url" label="base_url" rules={[{ required: true }]}>
             <Input placeholder="http://127.0.0.1:11434/v1" />
           </Form.Item>
-          <Form.Item name="api_key" label="OPENAI_API_KEY / api_key" extra="留空保存时按 sk-no-auth 提交（本地 Ollama）">
-            <Input.Password placeholder="sk-no-auth 或云端 key" />
+          <Form.Item
+            name="api_key"
+            label="api_key"
+            extra="不填则保持服务端原值；填空并保存则清成 sk-no-auth"
+          >
+            <Input.Password placeholder="不修改请留空" visibilityToggle />
           </Form.Item>
-          <Form.Item name="model" label="OPENAI_MODEL / model" rules={[{ required: true }]}>
+          <Form.Item name="model" label="model" rules={[{ required: true }]}>
             <Input placeholder="qwen2.5:3b" />
           </Form.Item>
-          <Button type="primary" htmlType="submit" loading={saving}>应用并刷新 health</Button>
+          <Space>
+            <Button type="primary" htmlType="submit" loading={saving}>应用并刷新 health</Button>
+            <Button
+              loading={saving}
+              onClick={() => {
+                const v = form.getFieldsValue()
+                void onSaveLlm(v, true)
+              }}
+            >
+              清除 key 为 sk-no-auth
+            </Button>
+          </Space>
         </Form>
       </Card>
     </Space>
