@@ -21,15 +21,23 @@ class Settings(BaseSettings):
     qdrant_collection: str = "sdnu_chunks"
     qdrant_path: str | None = None
 
-    openai_api_key: str | None = None
-    openai_base_url: str = "https://api.openai.com/v1"
-    openai_model: str = "gpt-4o-mini"
+    # Retrieval: prefer 后端1 HTTP when local Qdrant path is locked by 后端1
+    retrieval_backend: str = "backend1"  # backend1 | qdrant
+    backend1_base_url: str = "http://127.0.0.1:8001"
 
-    embedding_provider: str = "huggingface"  # openai | huggingface
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    # OpenAI-compatible LLM (ChatOpenAI) — local Ollama /v1 by default
+    openai_api_key: str | None = None
+    openai_base_url: str = "http://127.0.0.1:11434/v1"
+    openai_model: str = "qwen2.5:3b"
+
+    # Embeddings (must match 后端1 ingest for direct Qdrant mode)
+    embedding_provider: str = "ollama"  # ollama | openai | huggingface | hash
+    embedding_model: str = "qwen3-embedding:0.6b"
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_embedding_model: str = "qwen3-embedding:0.6b"
     openai_embedding_model: str = "text-embedding-3-small"
 
-    jwt_secret: str = "change-me-in-production"
+    jwt_secret: str = "change-me-to-a-long-random-string"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 1440
 

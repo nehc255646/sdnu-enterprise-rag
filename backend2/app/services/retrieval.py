@@ -1,6 +1,8 @@
-"""Qdrant RetrievalClient — every query MUST filter by tenant_id.
+"""RetrievalClient — tenant-scoped search via 后端1 HTTP or direct Qdrant.
 
 Collection name defaults to `sdnu_chunks` (shared with 后端1 via QDRANT_COLLECTION).
+When 后端1 uses local Qdrant path (./data/qdrant-b1), prefer RETRIEVAL_BACKEND=backend1
+so we call POST {backend1}/api/v1/retrieve with forwarded Authorization + X-Tenant-Id.
 """
 
 from __future__ import annotations
@@ -9,6 +11,8 @@ import logging
 from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import Any
+
+import httpx
 
 from app.core.config import get_settings
 from app.services.cache import cache_get, cache_set, retrieval_cache_key
@@ -29,8 +33,70 @@ class RetrievalClient(ABC):
         top_k: int = 5,
         doc_type: str | None = None,
         use_cache: bool = True,
+        authorization: str | None = None,
     ) -> list[dict[str, Any]]:
         """Return hits; implementations MUST enforce tenant_id filter."""
+
+
+class Backend1RetrievalClient(RetrievalClient):
+    """Call 后端1 POST /api/v1/retrieve with forwarded Bearer + X-Tenant-Id."""
+
+    def search(
+        self,
+        *,
+        query: str,
+        tenant_id: str,
+        top_k: int = 5,
+        doc_type: str | None = None,
+        use_cache: bool = True,
+        authorization: str | None = None,
+    ) -> list[dict[str, Any]]:
+        if not tenant_id or not str(tenant_id).strip():
+            raise ValueError("tenant_id is required for retrieval")
+        tenant_id = str(tenant_id).strip()
+
+        settings = get_settings()
+        base = (settings.backend1_base_url or "http://127.0.0.1:8001").rstrip("/")
+        url = f"{base}{settings.api_prefix}/retrieve"
+
+        headers: dict[str, str] = {"X-Tenant-Id": tenant_id, "Content-Type": "application/json"}
+        if authorization:
+            token = authorization if authorization.lower().startswith("bearer ") else f"Bearer {authorization}"
+            headers["Authorization"] = token
+
+        body: dict[str, Any] = {"query": query, "top_k": top_k}
+        if doc_type:
+            body["doc_type"] = doc_type
+
+        try:
+            with httpx.Client(timeout=60.0) as client:
+                r = client.post(url, json=body, headers=headers)
+                r.raise_for_status()
+                data = r.json()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("backend1 retrieve failed: %s", exc)
+            raise
+
+        hits_raw = data.get("hits") or []
+        results: list[dict[str, Any]] = []
+        for h in hits_raw:
+            hit_tenant = h.get("tenant_id")
+            if hit_tenant is not None and hit_tenant != tenant_id:
+                logger.error("tenant leak blocked from backend1: expected=%s got=%s", tenant_id, hit_tenant)
+                continue
+            results.append(
+                {
+                    "score": float(h.get("score") or 0.0),
+                    "point_id": str(h.get("point_id") or ""),
+                    "text": h.get("text") or "",
+                    "document_id": h.get("document_id"),
+                    "doc_type": h.get("doc_type"),
+                    "chunk_index": h.get("chunk_index"),
+                    "filename": h.get("filename"),
+                    "tenant_id": hit_tenant or tenant_id,
+                }
+            )
+        return results
 
 
 class QdrantRetrievalClient(RetrievalClient):
@@ -74,7 +140,9 @@ class QdrantRetrievalClient(RetrievalClient):
         top_k: int = 5,
         doc_type: str | None = None,
         use_cache: bool = True,
+        authorization: str | None = None,
     ) -> list[dict[str, Any]]:
+        del authorization  # unused for direct Qdrant
         if not tenant_id or not str(tenant_id).strip():
             raise ValueError("tenant_id is required for retrieval")
 
@@ -137,6 +205,75 @@ class QdrantRetrievalClient(RetrievalClient):
         return results
 
 
+class RoutingRetrievalClient(RetrievalClient):
+    """Prefer 后端1 HTTP retrieve when configured; fall back to direct Qdrant if server is up."""
+
+    def __init__(self) -> None:
+        self._backend1 = Backend1RetrievalClient()
+        self._qdrant = QdrantRetrievalClient()
+
+    def search(
+        self,
+        *,
+        query: str,
+        tenant_id: str,
+        top_k: int = 5,
+        doc_type: str | None = None,
+        use_cache: bool = True,
+        authorization: str | None = None,
+    ) -> list[dict[str, Any]]:
+        settings = get_settings()
+        backend = (settings.retrieval_backend or "backend1").lower().strip()
+
+        if backend == "backend1":
+            try:
+                return self._backend1.search(
+                    query=query,
+                    tenant_id=tenant_id,
+                    top_k=top_k,
+                    doc_type=doc_type,
+                    use_cache=use_cache,
+                    authorization=authorization,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("backend1 retrieve error, trying Qdrant fallback: %s", exc)
+                # Fall through to Qdrant only if HTTP URL looks reachable
+                if self._qdrant_http_up():
+                    return self._qdrant.search(
+                        query=query,
+                        tenant_id=tenant_id,
+                        top_k=top_k,
+                        doc_type=doc_type,
+                        use_cache=use_cache,
+                        authorization=authorization,
+                    )
+                raise
+
+        # Explicit qdrant mode
+        return self._qdrant.search(
+            query=query,
+            tenant_id=tenant_id,
+            top_k=top_k,
+            doc_type=doc_type,
+            use_cache=use_cache,
+            authorization=authorization,
+        )
+
+    def _qdrant_http_up(self) -> bool:
+        settings = get_settings()
+        url = (settings.qdrant_url or "").strip()
+        if not url or settings.qdrant_path:
+            return False
+        try:
+            from qdrant_client import QdrantClient
+
+            qc = QdrantClient(url=url, api_key=settings.qdrant_api_key or None, timeout=1)
+            qc.get_collections()
+            return True
+        except Exception:  # noqa: BLE001
+            return False
+
+
 class InMemoryRetrievalClient(RetrievalClient):
     """Test double: stores docs with tenant_id and filters strictly."""
 
@@ -165,7 +302,9 @@ class InMemoryRetrievalClient(RetrievalClient):
         top_k: int = 5,
         doc_type: str | None = None,
         use_cache: bool = True,
+        authorization: str | None = None,
     ) -> list[dict[str, Any]]:
+        del use_cache, authorization
         if not tenant_id:
             raise ValueError("tenant_id is required for retrieval")
         q = query.lower()
@@ -184,4 +323,4 @@ class InMemoryRetrievalClient(RetrievalClient):
 
 @lru_cache
 def get_retrieval_client() -> RetrievalClient:
-    return QdrantRetrievalClient()
+    return RoutingRetrievalClient()

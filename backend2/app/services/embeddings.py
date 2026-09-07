@@ -1,59 +1,112 @@
-"""Query embeddings — must match 后端1 ingest model for Qdrant search."""
+"""Swappable embedding backend: openai | huggingface | ollama | hash.
+
+Aligned with 后端1 so query vectors match ingested chunks (qwen3-embedding:0.6b / 1024-dim).
+"""
 
 from __future__ import annotations
 
-import logging
 from functools import lru_cache
 
-from app.core.config import get_settings
+import httpx
+from langchain_core.embeddings import Embeddings
 
-logger = logging.getLogger(__name__)
+from app.core.config import Settings, get_settings
 
 
-@lru_cache
-def get_embeddings():
-    settings = get_settings()
-    provider = (settings.embedding_provider or "huggingface").lower()
+class HashEmbeddings(Embeddings):
+    """Deterministic bag-of-bytes vectors for offline smoke / demo without model download."""
+
+    def __init__(self, dims: int = 64):
+        self.dims = dims
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return [self.embed_query(t) for t in texts]
+
+    def embed_query(self, text: str) -> list[float]:
+        vec = [0.0] * self.dims
+        data = text.encode("utf-8")
+        for i, b in enumerate(data):
+            vec[i % self.dims] += ((b % 31) + 1) / 31.0
+            vec[(i * 7) % self.dims] += ((b % 17) + 1) / 17.0
+        for ch in text:
+            o = ord(ch)
+            if o > 127:
+                vec[o % self.dims] += 0.15
+        norm = sum(v * v for v in vec) ** 0.5 or 1.0
+        return [v / norm for v in vec]
+
+
+class OllamaEmbeddings(Embeddings):
+    """Ollama native /api/embed (OpenAI-compatible /v1/embeddings also works via openai provider)."""
+
+    def __init__(self, *, model: str, base_url: str = "http://127.0.0.1:11434", timeout: float = 120.0):
+        self.model = model
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+
+    def _embed(self, texts: list[str]) -> list[list[float]]:
+        # Prefer /api/embed (batch); fall back to /api/embeddings per text
+        url = f"{self.base_url}/api/embed"
+        try:
+            with httpx.Client(timeout=self.timeout) as client:
+                r = client.post(url, json={"model": self.model, "input": texts})
+                if r.status_code == 404:
+                    raise httpx.HTTPStatusError("not found", request=r.request, response=r)
+                r.raise_for_status()
+                data = r.json()
+                embs = data.get("embeddings")
+                if not embs:
+                    raise RuntimeError(f"ollama embed empty response: {data}")
+                return embs
+        except httpx.HTTPStatusError:
+            out: list[list[float]] = []
+            with httpx.Client(timeout=self.timeout) as client:
+                for t in texts:
+                    r = client.post(
+                        f"{self.base_url}/api/embeddings",
+                        json={"model": self.model, "prompt": t},
+                    )
+                    r.raise_for_status()
+                    out.append(r.json()["embedding"])
+            return out
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        return self._embed(texts)
+
+    def embed_query(self, text: str) -> list[float]:
+        return self._embed([text])[0]
+
+
+def build_embeddings(settings: Settings | None = None) -> Embeddings:
+    settings = settings or get_settings()
+    provider = settings.embedding_provider.lower()
+    if provider == "hash":
+        return HashEmbeddings()
+    if provider == "ollama":
+        return OllamaEmbeddings(
+            model=settings.ollama_embedding_model or settings.embedding_model,
+            base_url=settings.ollama_base_url,
+        )
     if provider == "openai":
         from langchain_openai import OpenAIEmbeddings
 
-        return OpenAIEmbeddings(
-            model=settings.openai_embedding_model,
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-        )
-    # Default: local HuggingFace (no API key needed for smoke)
-    try:
+        kwargs: dict = {"model": settings.openai_embedding_model}
+        api_key = settings.openai_api_key or "sk-no-auth"
+        kwargs["api_key"] = api_key
+        if settings.openai_base_url:
+            kwargs["base_url"] = settings.openai_base_url
+        return OpenAIEmbeddings(**kwargs)
+
+    if provider == "huggingface":
         from langchain_huggingface import HuggingFaceEmbeddings
 
         return HuggingFaceEmbeddings(model_name=settings.embedding_model)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("HuggingFace embeddings unavailable (%s); using hash stub", exc)
-        return _HashEmbeddings()
+
+    raise ValueError(f"Unsupported EMBEDDING_PROVIDER: {settings.embedding_provider}")
 
 
-class _HashEmbeddings:
-    """Deterministic stub for unit tests / offline smoke (dim=384)."""
-
-    dim = 384
-
-    def embed_query(self, text: str) -> list[float]:
-        import hashlib
-        import struct
-
-        digest = hashlib.sha256(text.encode()).digest()
-        vals: list[float] = []
-        seed = digest
-        while len(vals) < self.dim:
-            for i in range(0, len(seed), 4):
-                if len(vals) >= self.dim:
-                    break
-                chunk = seed[i : i + 4]
-                if len(chunk) < 4:
-                    break
-                (n,) = struct.unpack(">I", chunk)
-                vals.append((n / 0xFFFFFFFF) * 2 - 1)
-            seed = hashlib.sha256(seed).digest()
-        # L2 normalize
-        norm = sum(v * v for v in vals) ** 0.5 or 1.0
-        return [v / norm for v in vals]
+@lru_cache
+def get_embeddings() -> Embeddings:
+    return build_embeddings()
