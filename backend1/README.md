@@ -75,3 +75,16 @@ app/
   workers/      # Redis ingest worker
 docker-compose.yml
 ```
+
+## Embedding（Ollama）
+
+默认：
+
+```
+EMBEDDING_PROVIDER=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_EMBEDDING_MODEL=qwen3-embedding:0.6b
+```
+
+向量维度 **1024**。换 embedding 模型后会按维度重建 collection，并需重灌语料。后端2 检索必须同模同维。
+

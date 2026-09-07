@@ -43,7 +43,16 @@ def _doc_to_status(doc: Document) -> IngestStatusResponse:
 @router.get("/health", response_model=HealthResponse, tags=["ops"])
 def health():
     settings = get_settings()
-    return HealthResponse(status="ok", service=settings.app_name, env=settings.app_env)
+    model = settings.ollama_embedding_model if settings.embedding_provider == "ollama" else (
+        settings.openai_embedding_model if settings.embedding_provider == "openai" else settings.embedding_model
+    )
+    return HealthResponse(
+        status="ok",
+        service=settings.app_name,
+        env=settings.app_env,
+        embedding_provider=settings.embedding_provider,
+        embedding_model=model,
+    )
 
 
 @router.get("/documents", response_model=DocumentListResponse, tags=["documents"])

@@ -29,12 +29,22 @@ def ensure_collection(vector_size: int, settings: Settings | None = None) -> Non
     name = settings.qdrant_collection
     existing = {c.name for c in client.get_collections().collections}
     if name in existing:
-        return
+        info = client.get_collection(name)
+        # recreate when embedding model/dim changes (e.g. hash→ollama)
+        current = None
+        try:
+            params = info.config.params.vectors
+            current = params.size if hasattr(params, "size") else None
+        except Exception:
+            current = None
+        if current is not None and current != vector_size:
+            client.delete_collection(name)
+        else:
+            return
     client.create_collection(
         collection_name=name,
         vectors_config=qm.VectorParams(size=vector_size, distance=qm.Distance.COSINE),
     )
-    # payload indexes matter on server Qdrant; local mode warns and ignores
     for field in ("tenant_id", "document_id", "doc_type"):
         try:
             client.create_payload_index(

@@ -1,9 +1,10 @@
-"""Swappable embedding backend: openai | huggingface | hash (offline demo)."""
+"""Swappable embedding backend: openai | huggingface | ollama | hash."""
 
 from __future__ import annotations
 
 from functools import lru_cache
 
+import httpx
 from langchain_core.embeddings import Embeddings
 
 from app.core.config import Settings, get_settings
@@ -24,7 +25,6 @@ class HashEmbeddings(Embeddings):
         for i, b in enumerate(data):
             vec[i % self.dims] += ((b % 31) + 1) / 31.0
             vec[(i * 7) % self.dims] += ((b % 17) + 1) / 17.0
-        # light unigram boost for CJK chars
         for ch in text:
             o = ord(ch)
             if o > 127:
@@ -33,11 +33,59 @@ class HashEmbeddings(Embeddings):
         return [v / norm for v in vec]
 
 
+class OllamaEmbeddings(Embeddings):
+    """Ollama native /api/embed (OpenAI-compatible /v1/embeddings also works via openai provider)."""
+
+    def __init__(self, *, model: str, base_url: str = "http://127.0.0.1:11434", timeout: float = 120.0):
+        self.model = model
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+
+    def _embed(self, texts: list[str]) -> list[list[float]]:
+        # Prefer /api/embed (batch); fall back to /api/embeddings per text
+        url = f"{self.base_url}/api/embed"
+        try:
+            with httpx.Client(timeout=self.timeout) as client:
+                r = client.post(url, json={"model": self.model, "input": texts})
+                if r.status_code == 404:
+                    raise httpx.HTTPStatusError("not found", request=r.request, response=r)
+                r.raise_for_status()
+                data = r.json()
+                embs = data.get("embeddings")
+                if not embs:
+                    raise RuntimeError(f"ollama embed empty response: {data}")
+                return embs
+        except httpx.HTTPStatusError:
+            out: list[list[float]] = []
+            with httpx.Client(timeout=self.timeout) as client:
+                for t in texts:
+                    r = client.post(
+                        f"{self.base_url}/api/embeddings",
+                        json={"model": self.model, "prompt": t},
+                    )
+                    r.raise_for_status()
+                    out.append(r.json()["embedding"])
+            return out
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        return self._embed(texts)
+
+    def embed_query(self, text: str) -> list[float]:
+        return self._embed([text])[0]
+
+
 def build_embeddings(settings: Settings | None = None) -> Embeddings:
     settings = settings or get_settings()
     provider = settings.embedding_provider.lower()
     if provider == "hash":
         return HashEmbeddings()
+    if provider == "ollama":
+        return OllamaEmbeddings(
+            model=settings.ollama_embedding_model or settings.embedding_model,
+            base_url=settings.ollama_base_url,
+        )
     if provider == "openai":
         from langchain_openai import OpenAIEmbeddings
 

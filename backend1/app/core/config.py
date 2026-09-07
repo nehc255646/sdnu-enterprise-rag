@@ -18,8 +18,10 @@ class Settings(BaseSettings):
     qdrant_collection: str = "sdnu_chunks"
     qdrant_path: str | None = None  # local disk mode when Docker unavailable
 
-    embedding_provider: str = "huggingface"  # openai | huggingface
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    embedding_provider: str = "ollama"  # ollama | openai | huggingface | hash
+    embedding_model: str = "qwen3-embedding:0.6b"
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_embedding_model: str = "qwen3-embedding:0.6b"
     openai_api_key: str | None = None
     openai_api_base: str | None = None
     openai_embedding_model: str = "text-embedding-3-small"

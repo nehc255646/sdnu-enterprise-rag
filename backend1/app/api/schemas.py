@@ -10,6 +10,8 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     env: str
+    embedding_provider: str | None = None
+    embedding_model: str | None = None
 
 
 class IngestCreateResponse(BaseModel):
