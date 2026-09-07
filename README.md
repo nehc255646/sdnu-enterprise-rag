@@ -8,7 +8,7 @@
 |------|------|----------|
 | `backend1/` | Ingest + 向量检索（FastAPI + LangChain + Qdrant） | `:8001` |
 | `backend2/` | 鉴权 / 会话 / 对话 SSE（FastAPI + LangChain LCEL） | `:8002` |
-| `frontend/` | 文档管理 + 知识库对话（待合入） | — |
+| `frontend/` | 文档管理 + 知识库对话（React/Vite/Ant Design） | `:5173` |
 
 ## 栈
 
@@ -37,3 +37,7 @@ OpenAPI：`http://127.0.0.1:8001/docs`、`http://127.0.0.1:8002/docs`
 - 业务请求头：`X-Tenant-Id`（必填）；后端2 另需 `Authorization: Bearer <JWT>`
 - 后端1：`POST /api/v1/ingest`、`GET /api/v1/documents`、`POST /api/v1/retrieve`
 - 后端2：登录 / 会话 / `/chat/stream`（SSE：`citation`/`token`/`error`/`done`）
+
+## Frontend
+
+见 `frontend/README.md`。开发服务器默认 `:5173`，代理 `/ingest-api`→`:8001`、`/chat-api`→`:8002`。
