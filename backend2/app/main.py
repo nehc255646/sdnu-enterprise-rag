@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, chat, health, sessions
+from app.api import auth, chat, health, llm, sessions
 from app.core.config import get_settings
 from app.db.session import init_db
 
@@ -56,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix=prefix)
     app.include_router(sessions.router, prefix=prefix)
     app.include_router(chat.router, prefix=prefix)
+    app.include_router(llm.router, prefix=prefix)
 
     @app.get("/")
     def root():

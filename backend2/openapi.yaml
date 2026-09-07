@@ -62,3 +62,11 @@ paths:
       tags: [health]
       summary: Health + dependency status
       security: []
+  /api/v1/llm/config:
+    get:
+      tags: [llm]
+      summary: Read current OpenAI-compat LLM config (no api_key value)
+    put:
+      tags: [llm]
+      summary: Hot-update base_url / api_key? / model; health reflects immediately
+

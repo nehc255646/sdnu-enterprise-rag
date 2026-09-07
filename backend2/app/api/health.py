@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from sqlalchemy import text
 
 from app.core.config import get_settings
+from app.services.llm_runtime import get_llm_config
 from app.db.session import get_engine
 from app.schemas.health import DependencyStatus, HealthResponse
 from app.services.cache import get_redis
@@ -80,12 +81,13 @@ def health() -> HealthResponse:
         except Exception as exc:  # noqa: BLE001
             deps.append(DependencyStatus(name="backend1", ok=False, detail=str(exc)))
 
-    # LLM config (empty key OK for local sk-no-auth)
+    # LLM config (runtime overlay; empty key OK for local sk-no-auth)
+    llm_cfg = get_llm_config()
     deps.append(
         DependencyStatus(
             name="llm_config",
             ok=True,
-            detail=f"base={settings.openai_base_url} model={settings.openai_model}",
+            detail=f"base={llm_cfg.base_url} model={llm_cfg.model}",
         )
     )
 
@@ -102,7 +104,7 @@ def health() -> HealthResponse:
         dependencies=deps,
         embedding_provider=settings.embedding_provider,
         embedding_model=_embedding_model_label(settings),
-        llm_base_url=settings.openai_base_url,
-        llm_model=settings.openai_model,
+        llm_base_url=llm_cfg.base_url,
+        llm_model=llm_cfg.model,
         retrieval_backend=settings.retrieval_backend,
     )

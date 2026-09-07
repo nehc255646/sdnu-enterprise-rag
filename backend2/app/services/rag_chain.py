@@ -57,25 +57,20 @@ def hits_to_citations(hits: list[dict[str, Any]]) -> list[Citation]:
     ]
 
 
-def _effective_api_key() -> str:
-    settings = get_settings()
-    key = (settings.openai_api_key or "").strip()
-    return key if key else "sk-no-auth"
-
-
 def get_llm():
     """ChatOpenAI against OpenAI-compat endpoint (Ollama /v1, Nehchat, etc.).
 
-    Empty OPENAI_API_KEY → sk-no-auth for local proxies that ignore auth.
-    Does not require the chat model to be pulled; callers must degrade on errors.
+    Uses runtime overlay from PUT /llm/config when set; empty key → sk-no-auth.
     """
-    settings = get_settings()
     from langchain_openai import ChatOpenAI
 
+    from app.services.llm_runtime import effective_api_key, get_llm_config
+
+    cfg = get_llm_config()
     return ChatOpenAI(
-        model=settings.openai_model,
-        api_key=_effective_api_key(),
-        base_url=settings.openai_base_url or None,
+        model=cfg.model,
+        api_key=effective_api_key(cfg),
+        base_url=cfg.base_url or None,
         temperature=0.2,
         streaming=True,
     )
