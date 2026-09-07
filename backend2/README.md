@@ -89,6 +89,7 @@ data: {"message":"..."}
 - 向量集合默认 `sdnu_chunks`，payload 含 `tenant_id`（与后端1一致）
 - 本服务 **只检索**，不提供 upload/ingest；前端上传请调后端1 `POST /api/v1/ingest`
 - Embedding 模型需与后端1入库一致（`EMBEDDING_MODEL` / `EMBEDDING_PROVIDER`）
+- **JWT 对接**：算法 HS256；claims `sub`=user_id + `tenant_id`；请求头 `Authorization: Bearer` + 必填 `X-Tenant-Id`；共享 `JWT_SECRET` / `JWT_ALGORITHM`。完整说明见 [`docs/jwt-handoff.md`](docs/jwt-handoff.md)
 
 ## 租户隔离
 
@@ -104,14 +105,17 @@ data: {"message":"..."}
 pytest -q
 ```
 
-## 评测（Ragas）
+## 评测（Ragas-style）
 
-最小可跳过样例：`tests/test_ragas_sample.py`（`pytest.importorskip("ragas")`；未安装 ragas 时跳过，仍文档化评测路径）。
+离线 smoke 样例：`tests/test_ragas_sample.py`（**始终可跑**，不依赖 live LLM / 不必安装 ragas）。
+对合成 contexts 计算 faithfulness / context-precision 风格分数；若已安装 `ragas`+`datasets` 则额外 soft-import 校验 Dataset 接线。
 
 ```bash
-# 可选：pip install ragas datasets
 pytest tests/test_ragas_sample.py -q
+# 可选：pip install ragas datasets
 ```
+
+详见 `docs/jwt-handoff.md` 的 JWT 对接与本 README「与后端1协作」。
 
 ## 目录
 

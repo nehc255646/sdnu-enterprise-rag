@@ -7,7 +7,9 @@ info:
     This file is a skeleton pointer for frontend / 后端1 integration.
     Qdrant collection: sdnu_chunks (aligned with 后端1).
     Protected routes require Authorization: Bearer <JWT> and X-Tenant-Id
-    (must match JWT tenant_id).
+    (OpenAPI required=true; must match JWT tenant_id; empty→400, mismatch→403).
+    Live schema: GET /openapi.json (Header(..., alias=X-Tenant-Id)).
+    JWT handoff for 后端1: docs/jwt-handoff.md (HS256, sub+tenant_id, JWT_SECRET).
 servers:
   - url: http://localhost:8002
     description: local 后端2

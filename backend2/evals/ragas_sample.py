@@ -1,4 +1,6 @@
-"""Pointer: Ragas sample lives at tests/test_ragas_sample.py (pytest.importorskip).
+"""Pointer: Ragas-style sample lives at tests/test_ragas_sample.py.
+
+Offline smoke always runs (no live LLM). Optional ragas soft-import when installed.
 
 Run: pytest tests/test_ragas_sample.py -q
 """

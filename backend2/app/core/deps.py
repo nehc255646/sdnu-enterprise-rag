@@ -25,9 +25,15 @@ class CurrentUser:
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: Session = Depends(get_db),
-    x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-Id"),
 ) -> CurrentUser:
-    """Require Bearer JWT; tenant_id comes from token (header must match if present)."""
+    """Require Bearer JWT; tenant_id comes from token (header must match).
+
+    OpenAPI marks X-Tenant-Id as required (no default). Runtime:
+    - empty / whitespace-only header → 400
+    - header != JWT tenant_id → 403
+    Missing header is rejected by FastAPI as required (422) before this body runs.
+    """
     if credentials is None or not credentials.credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bearer token required")
     try:
