@@ -50,7 +50,7 @@ X-Tenant-Id: <tenant_id>
 ```
 
 - `X-Tenant-Id` 在 OpenAPI 中为 **required**
-- 空值 → `400`
+- 缺头 → `422`（FastAPI 校验）；空值 → `400`（业务校验）。对接文档写 **400/422**，勿硬写死单一码
 - 与 JWT `tenant_id` 不一致 → `403`
 - 缺 Bearer / 无效 token → `401`
 
