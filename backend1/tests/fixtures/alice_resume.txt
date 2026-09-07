@@ -1,0 +1,1 @@
+Alice Chen interned at Acme Corp building FastAPI microservices and LangChain RAG pipelines.

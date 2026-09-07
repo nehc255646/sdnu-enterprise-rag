@@ -1,0 +1,62 @@
+openapi: 3.1.0
+info:
+  title: RAG Enterprise — 后端2 Auth & Chat
+  version: 0.1.0
+  description: >
+    Canonical OpenAPI is served live at GET /openapi.json when the app runs.
+    This file is a skeleton pointer for frontend / 后端1 integration.
+    Qdrant collection: sdnu_chunks (aligned with 后端1).
+    Protected routes require Authorization: Bearer <JWT> and X-Tenant-Id
+    (must match JWT tenant_id).
+servers:
+  - url: http://localhost:8002
+    description: local 后端2
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    TenantHeader:
+      type: apiKey
+      in: header
+      name: X-Tenant-Id
+      description: Required on protected routes; must equal JWT tenant_id
+security:
+  - bearerAuth: []
+    TenantHeader: []
+paths:
+  /api/v1/auth/register:
+    post:
+      tags: [auth]
+      summary: Register user (optional tenant_id)
+      security: []
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Login → JWT access_token
+      security: []
+  /api/v1/auth/me:
+    get:
+      tags: [auth]
+      summary: Current user (requires Bearer + X-Tenant-Id)
+  /api/v1/sessions:
+    get:
+      tags: [sessions]
+      summary: List sessions for current user/tenant
+    post:
+      tags: [sessions]
+      summary: Create chat session
+  /api/v1/chat:
+    post:
+      tags: [chat]
+      summary: Non-streaming RAG chat
+  /api/v1/chat/stream:
+    post:
+      tags: [chat]
+      summary: SSE streaming RAG chat (token/citation/error/done)
+  /api/v1/health:
+    get:
+      tags: [health]
+      summary: Health + dependency status
+      security: []
