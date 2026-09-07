@@ -40,7 +40,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#f5f7fb' }}>
+    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#ffffff' }}>
       <Card style={{ width: 420 }} title="山师大知识库 · 登录">
         <Typography.Paragraph type="secondary">
           Demo 租户建议使用 <Typography.Text code>{defaultTenant}</Typography.Text>

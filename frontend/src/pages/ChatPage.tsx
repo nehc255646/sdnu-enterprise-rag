@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, Card, Input, List, Space, Typography, message, Spin, Collapse, Empty } from 'antd'
+import { Button, Card, Input, List, Space, Typography, message, Spin, Collapse, Empty, theme } from 'antd'
 import { PlusOutlined, SendOutlined, DeleteOutlined } from '@ant-design/icons'
 import { createSession, deleteSession, getSession, listSessions, streamChat } from '../api/chat'
 import type { Citation, SessionOut } from '../types'
@@ -22,6 +22,7 @@ function parseCitations(raw?: string | null): Citation[] {
 }
 
 export default function ChatPage() {
+  const { token } = theme.useToken()
   const [sessions, setSessions] = useState<SessionOut[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -227,7 +228,7 @@ export default function ChatPage() {
               <div key={m.id} style={{ marginBottom: 16, display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
                 <div style={{
                   maxWidth: '80%',
-                  background: m.role === 'user' ? '#1677ff' : '#f5f5f5',
+                  background: m.role === 'user' ? token.colorPrimary : '#f5f5f5',
                   color: m.role === 'user' ? '#fff' : 'inherit',
                   padding: '10px 14px',
                   borderRadius: 12,

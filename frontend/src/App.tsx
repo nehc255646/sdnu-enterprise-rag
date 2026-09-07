@@ -1,11 +1,12 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { ConfigProvider, App as AntApp } from 'antd'
-import zhCN from 'antd/locale/zh_CN'
+import { App as AntApp } from 'antd'
 import { AuthProvider, useAuth } from './auth/AuthContext'
+import { ThemeProvider } from './theme/ThemeContext'
 import AppLayout from './layout/AppLayout'
 import LoginPage from './pages/LoginPage'
 import DocumentsPage from './pages/DocumentsPage'
 import ChatPage from './pages/ChatPage'
+import SettingsPage from './pages/SettingsPage'
 import type { ReactNode } from 'react'
 
 function PrivateRoute({ children }: { children: ReactNode }) {
@@ -16,7 +17,7 @@ function PrivateRoute({ children }: { children: ReactNode }) {
 
 export default function App() {
   return (
-    <ConfigProvider locale={zhCN} theme={{ token: { colorPrimary: '#1677ff', borderRadius: 8 } }}>
+    <ThemeProvider>
       <AntApp>
         <AuthProvider>
           <BrowserRouter>
@@ -33,12 +34,13 @@ export default function App() {
                 <Route index element={<Navigate to="/chat" replace />} />
                 <Route path="chat" element={<ChatPage />} />
                 <Route path="docs" element={<DocumentsPage />} />
+                <Route path="settings" element={<SettingsPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
         </AuthProvider>
       </AntApp>
-    </ConfigProvider>
+    </ThemeProvider>
   )
 }
