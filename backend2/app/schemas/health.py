@@ -5,6 +5,7 @@ class DependencyStatus(BaseModel):
     name: str
     ok: bool
     detail: str | None = None
+    optional: bool = False
 
 
 class HealthResponse(BaseModel):

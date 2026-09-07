@@ -26,6 +26,7 @@ def _embedding_model_label(settings) -> str:
 def health() -> HealthResponse:
     settings = get_settings()
     deps: list[DependencyStatus] = []
+    use_backend1 = (settings.retrieval_backend or "").lower() == "backend1"
 
     # DB
     try:
@@ -36,36 +37,50 @@ def health() -> HealthResponse:
     except Exception as exc:  # noqa: BLE001
         deps.append(DependencyStatus(name="database", ok=False, detail=str(exc)))
 
-    # Redis
+    # Redis (optional cache when retrieval_backend=backend1)
     try:
         client = get_redis()
         if client is None:
-            deps.append(DependencyStatus(name="redis", ok=False, detail="unreachable"))
+            deps.append(
+                DependencyStatus(
+                    name="redis",
+                    ok=False,
+                    detail=("optional: unreachable" if use_backend1 else "unreachable"),
+                    optional=use_backend1,
+                )
+            )
         else:
             client.ping()
-            deps.append(DependencyStatus(name="redis", ok=True))
+            deps.append(DependencyStatus(name="redis", ok=True, optional=use_backend1))
     except Exception as exc:  # noqa: BLE001
-        deps.append(DependencyStatus(name="redis", ok=False, detail=str(exc)))
+        detail = str(exc)
+        if use_backend1 and not detail.startswith("optional:"):
+            detail = f"optional: {detail}"
+        deps.append(DependencyStatus(name="redis", ok=False, detail=detail, optional=use_backend1))
 
-    # Qdrant (optional when retrieval_backend=backend1)
+    # Qdrant (optional when retrieval_backend=backend1 — retrieval goes via backend1)
     try:
         from qdrant_client import QdrantClient
 
         if settings.qdrant_path:
             qc = QdrantClient(path=settings.qdrant_path)
             qc.get_collections()
-            deps.append(DependencyStatus(name="qdrant", ok=True))
+            deps.append(DependencyStatus(name="qdrant", ok=True, optional=use_backend1))
         elif settings.qdrant_url:
             qc = QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key or None, timeout=2)
             qc.get_collections()
-            deps.append(DependencyStatus(name="qdrant", ok=True))
+            deps.append(DependencyStatus(name="qdrant", ok=True, optional=use_backend1))
         else:
-            deps.append(DependencyStatus(name="qdrant", ok=False, detail="no QDRANT_URL/PATH"))
+            detail = "optional: no QDRANT_URL/PATH" if use_backend1 else "no QDRANT_URL/PATH"
+            deps.append(DependencyStatus(name="qdrant", ok=False, detail=detail, optional=use_backend1))
     except Exception as exc:  # noqa: BLE001
-        deps.append(DependencyStatus(name="qdrant", ok=False, detail=str(exc)))
+        detail = str(exc)
+        if use_backend1 and not detail.startswith("optional:"):
+            detail = f"optional: {detail}"
+        deps.append(DependencyStatus(name="qdrant", ok=False, detail=detail, optional=use_backend1))
 
     # backend1 retrieve (when configured)
-    if (settings.retrieval_backend or "").lower() == "backend1":
+    if use_backend1:
         try:
             import httpx
 
@@ -92,9 +107,11 @@ def health() -> HealthResponse:
     )
 
     db_ok = any(d.ok for d in deps if d.name == "database")
+    # Optional deps (e.g. redis/qdrant when retrieval_backend=backend1) must not force degraded.
+    required = [d for d in deps if not d.optional]
     if not db_ok:
         overall = "error"
-    elif all(d.ok for d in deps):
+    elif all(d.ok for d in required):
         overall = "ok"
     else:
         overall = "degraded"
