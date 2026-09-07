@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     chunk_overlap: int = 48
     upload_dir: str = "./data/uploads"
 
+    # JWT (shared with 后端2 — see backend2/docs/jwt-handoff.md)
+    jwt_secret: str = "change-me-to-a-long-random-string"
+    jwt_algorithm: str = "HS256"
+
 
 @lru_cache
 def get_settings() -> Settings:

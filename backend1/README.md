@@ -37,15 +37,21 @@ uv run python -m app.workers.ingest_worker
 
 OpenAPI：`http://localhost:8001/docs`
 
-## 鉴权约定（给后端2 / 前端）
+## 鉴权约定（与后端2 对齐）
 
-所有业务接口必须带请求头：
+受保护接口需同时带：
 
 ```
+Authorization: Bearer <access_token>
 X-Tenant-Id: <tenant>
 ```
 
-后端2 上线 JWT 后可改为从 token 解析 `tenant_id`，本服务已按租户过滤。
+JWT：HS256，claims 含 `sub` + `tenant_id`，与后端2 共享 `JWT_SECRET`（见 monorepo `backend2/docs/jwt-handoff.md`）。
+- 缺/无效 token → 401
+- 缺 `X-Tenant-Id` → 400
+- 与 JWT `tenant_id` 不一致 → 403
+
+`GET /api/v1/health` 公开。
 
 ## 主要 API
 
