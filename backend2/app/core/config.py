@@ -42,10 +42,13 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 1440
 
     rag_top_k: int = 5
+    rag_history_turns: int = 6
 
-    # Chat rate limit (Redis-backed; degrades to allow when Redis down)
     rate_limit_enabled: bool = True
     rate_limit_chat_per_minute: int = 60
+    rate_limit_auth_per_minute: int = 20
+    cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
+    llm_base_url_allowlist: str = ""
 
 
 @lru_cache

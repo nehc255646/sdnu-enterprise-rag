@@ -38,9 +38,11 @@ def ensure_collection(vector_size: int, settings: Settings | None = None) -> Non
         except Exception:
             current = None
         if current is not None and current != vector_size:
-            client.delete_collection(name)
-        else:
-            return
+            raise RuntimeError(
+                f"collection {name} vector size is {current}, embedding is {vector_size}; "
+                "recreate the collection and re-ingest (refusing automatic wipe)"
+            )
+        return
     client.create_collection(
         collection_name=name,
         vectors_config=qm.VectorParams(size=vector_size, distance=qm.Distance.COSINE),
@@ -117,6 +119,8 @@ def search(
     results: list[dict[str, Any]] = []
     for h in response.points:
         payload = h.payload or {}
+        if payload.get("tenant_id") != tenant_id:
+            continue
         results.append(
             {
                 "score": float(h.score or 0.0),

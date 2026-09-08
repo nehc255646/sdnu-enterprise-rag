@@ -314,9 +314,8 @@ class InMemoryRetrievalClient(RetrievalClient):
                 continue
             if doc_type and d.get("doc_type") != doc_type:
                 continue
-            if q in d["text"].lower() or True:  # score by simple containment then all
-                score = 1.0 if q in d["text"].lower() else 0.1
-                hits.append({**d, "score": score})
+            if q in d["text"].lower():
+                hits.append({**d, "score": 1.0})
         hits.sort(key=lambda x: x["score"], reverse=True)
         return hits[:top_k]
 

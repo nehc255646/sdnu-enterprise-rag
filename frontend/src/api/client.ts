@@ -55,6 +55,10 @@ async function parseError(res: Response): Promise<string> {
   }
 }
 
+function isPublicAuthPath(path: string) {
+  return path.includes('/auth/login') || path.includes('/auth/register')
+}
+
 export async function chatFetch(path: string, init: RequestInit = {}) {
   const headers = authHeaders(init.headers)
   if (init.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
@@ -62,8 +66,8 @@ export async function chatFetch(path: string, init: RequestInit = {}) {
   }
   const res = await fetch(`${CHAT_BASE}${path}`, { ...init, headers })
   if (res.status === 401) {
-    handleUnauthorized(401)
-    throw new Error('未登录或登录已过期')
+    if (!isPublicAuthPath(path)) handleUnauthorized(401)
+    throw new Error(isPublicAuthPath(path) ? await parseError(res) : '未登录或登录已过期')
   }
   if (!res.ok) throw new Error(await parseError(res))
   if (res.status === 204) return null

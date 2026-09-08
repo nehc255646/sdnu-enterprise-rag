@@ -6,11 +6,14 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import auth, chat, health, llm, sessions
+
 from app.core.config import get_settings
+from app.core.security import assert_jwt_secret
 from app.db.session import init_db
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -20,13 +23,17 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     settings = get_settings()
+    assert_jwt_secret()
     if settings.qdrant_path:
         Path(settings.qdrant_path).mkdir(parents=True, exist_ok=True)
+    init_db()
+    logger.info("DB initialized")
     try:
-        init_db()
-        logger.info("DB initialized")
+        r = httpx.get(f"{settings.ollama_base_url.rstrip('/')}/api/tags", timeout=2.0)
+        if r.status_code >= 400:
+            logger.warning("Ollama probe status=%s at %s", r.status_code, settings.ollama_base_url)
     except Exception as exc:  # noqa: BLE001
-        logger.error("DB init failed (service will start degraded): %s", exc)
+        logger.warning("Ollama unreachable at %s (%s); bind 0.0.0.0:11434 for Docker", settings.ollama_base_url, exc)
     yield
 
 
@@ -43,10 +50,11 @@ def create_app() -> FastAPI:
         ),
         lifespan=lifespan,
     )
+    origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=origins or ["http://127.0.0.1:5173"],
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )

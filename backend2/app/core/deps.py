@@ -8,7 +8,7 @@ from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, validate_tenant_id
 from app.db.models import User
 from app.db.session import get_db
 
@@ -27,13 +27,6 @@ def get_current_user(
     db: Session = Depends(get_db),
     x_tenant_id: str = Header(..., alias="X-Tenant-Id"),
 ) -> CurrentUser:
-    """Require Bearer JWT; tenant_id comes from token (header must match).
-
-    OpenAPI marks X-Tenant-Id as required (no default). Runtime:
-    - empty / whitespace-only header → 400
-    - header != JWT tenant_id → 403
-    Missing header is rejected by FastAPI as required (422) before this body runs.
-    """
     if credentials is None or not credentials.credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bearer token required")
     try:
@@ -57,6 +50,10 @@ def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="X-Tenant-Id does not match token tenant",
         )
+    try:
+        validate_tenant_id(tenant_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid tenant_id") from None
 
     user = db.get(User, user_id)
     if user is None or user.tenant_id != tenant_id:
@@ -66,7 +63,6 @@ def get_current_user(
 
 
 def require_tenant_id(user: CurrentUser = Depends(get_current_user)) -> str:
-    """Every authenticated request carries tenant_id from JWT."""
     if not user.tenant_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="tenant_id required")
     return user.tenant_id

@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# 本机开发一键启动 / 停止：Postgres+Qdrant（Docker）、本机 Redis、Ollama、两个后端、前端。
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUN_DIR="${ROOT}/.run"
+JWT_SECRET_DEFAULT="change-me-to-a-long-random-string"
+
+mkdir -p "${RUN_DIR}"
+
+log() { printf '%s\n' "$*"; }
+die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+
+port_in_use() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn | grep -qE ":${port}[[:space:]]"
+  else
+    return 1
+  fi
+}
+
+wait_http() {
+  local url="$1" name="$2" tries="${3:-40}"
+  local i
+  for i in $(seq 1 "${tries}"); do
+    if curl -fsS -o /dev/null --max-time 2 "${url}" 2>/dev/null; then
+      log "  ${name} ready"
+      return 0
+    fi
+    sleep 0.5
+  done
+  die "${name} did not become ready: ${url}"
+}
+
+ensure_env() {
+  if [[ ! -f "${ROOT}/.env" ]]; then
+    cp "${ROOT}/.env.example" "${ROOT}/.env"
+  fi
+  if [[ ! -f "${ROOT}/backend1/.env" ]]; then
+    cp "${ROOT}/backend1/.env.example" "${ROOT}/backend1/.env"
+  fi
+  if [[ ! -f "${ROOT}/backend2/.env" ]]; then
+    cp "${ROOT}/backend2/.env.example" "${ROOT}/backend2/.env"
+  fi
+  if [[ ! -f "${ROOT}/frontend/.env" && -f "${ROOT}/frontend/.env.example" ]]; then
+    cp "${ROOT}/frontend/.env.example" "${ROOT}/frontend/.env"
+  fi
+}
+
+start_infra() {
+  command -v docker >/dev/null 2>&1 || die "docker not found"
+  docker compose -f "${ROOT}/backend1/docker-compose.yml" up -d postgres qdrant
+  if command -v redis-cli >/dev/null 2>&1 && redis-cli ping >/dev/null 2>&1; then
+    log "  redis: host service on :6379"
+  else
+    docker compose -f "${ROOT}/backend1/docker-compose.yml" up -d redis
+    log "  redis: docker :6379"
+  fi
+  command -v ollama >/dev/null 2>&1 || die "ollama not found; install from https://ollama.com"
+  if ! curl -fsS -o /dev/null --max-time 2 http://127.0.0.1:11434/api/tags; then
+    die "Ollama is not answering on 127.0.0.1:11434"
+  fi
+  ollama list | grep -q 'qwen3-embedding:0.6b' || ollama pull qwen3-embedding:0.6b
+  ollama list | grep -q 'qwen2.5:1.5b' || ollama pull qwen2.5:1.5b
+}
+
+start_backend1() {
+  if port_in_use 8001; then
+    log "  backend1 already on :8001"
+    return 0
+  fi
+  if [[ ! -d "${ROOT}/backend1/.venv" ]]; then
+    (cd "${ROOT}/backend1" && uv sync --python 3.12 --extra dev)
+  fi
+  nohup bash -lc "cd '${ROOT}/backend1' && uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload" \
+    >"${RUN_DIR}/backend1.log" 2>&1 &
+  echo $! >"${RUN_DIR}/backend1.pid"
+}
+
+start_backend2() {
+  if port_in_use 8002; then
+    log "  backend2 already on :8002"
+    return 0
+  fi
+  if [[ ! -d "${ROOT}/backend2/.venv" ]]; then
+    (cd "${ROOT}/backend2" && uv venv --python 3.12 .venv && uv pip install --python .venv -r requirements.txt)
+  fi
+  nohup bash -lc "cd '${ROOT}/backend2' && .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8002 --reload" \
+    >"${RUN_DIR}/backend2.log" 2>&1 &
+  echo $! >"${RUN_DIR}/backend2.pid"
+}
+
+start_frontend() {
+  if port_in_use 5173; then
+    log "  frontend already on :5173"
+    return 0
+  fi
+  if [[ ! -d "${ROOT}/frontend/node_modules" ]]; then
+    (cd "${ROOT}/frontend" && npm install)
+  fi
+  nohup bash -lc "cd '${ROOT}/frontend' && npm run dev -- --host 127.0.0.1 --port 5173" \
+    >"${RUN_DIR}/frontend.log" 2>&1 &
+  echo $! >"${RUN_DIR}/frontend.pid"
+}
+
+stop_pidfile() {
+  local pidfile="$1"
+  [[ -f "${pidfile}" ]] || return 0
+  local pid
+  pid="$(cat "${pidfile}" || true)"
+  if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+    kill "${pid}" 2>/dev/null || true
+    sleep 0.3
+    kill -9 "${pid}" 2>/dev/null || true
+  fi
+  rm -f "${pidfile}"
+}
+
+cmd_stop() {
+  stop_pidfile "${RUN_DIR}/frontend.pid"
+  stop_pidfile "${RUN_DIR}/backend2.pid"
+  stop_pidfile "${RUN_DIR}/backend1.pid"
+  log "stopped app processes (Postgres/Qdrant/Redis/Ollama left running)"
+}
+
+cmd_start() {
+  ensure_env
+  log "starting infra..."
+  start_infra
+  log "starting apps..."
+  start_backend1
+  start_backend2
+  start_frontend
+  wait_http "http://127.0.0.1:8001/api/v1/health" "backend1" 50
+  wait_http "http://127.0.0.1:8002/api/v1/health" "backend2" 50
+  wait_http "http://127.0.0.1:5173/" "frontend" 50
+  log ""
+  log "ready"
+  log "  frontend   http://127.0.0.1:5173"
+  log "  backend1   http://127.0.0.1:8001/docs"
+  log "  backend2   http://127.0.0.1:8002/docs"
+  log "  tenant     sdnu-demo"
+  log "  logs       ${RUN_DIR}/"
+  log "  stop       ${ROOT}/start.sh stop"
+  log "JWT_SECRET must match backend1/.env and backend2/.env (default ${JWT_SECRET_DEFAULT})"
+}
+
+case "${1:-start}" in
+  start) cmd_start ;;
+  stop) cmd_stop ;;
+  restart) cmd_stop; cmd_start ;;
+  *) die "usage: $0 [start|stop|restart]" ;;
+esac

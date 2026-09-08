@@ -1,9 +1,10 @@
-"""In-memory LLM config overlay — PUT /llm/config hot-swaps without restart."""
+"""Per-tenant in-memory LLM config overlay."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from threading import Lock
+from urllib.parse import urlparse
 
 from app.core.config import get_settings
 
@@ -16,18 +17,11 @@ class LLMRuntimeConfig:
 
 
 _lock = Lock()
-_override: LLMRuntimeConfig | None = None
+_overrides: dict[str, LLMRuntimeConfig] = {}
 
 
-def get_llm_config() -> LLMRuntimeConfig:
+def _env_config() -> LLMRuntimeConfig:
     settings = get_settings()
-    with _lock:
-        if _override is not None:
-            return LLMRuntimeConfig(
-                base_url=_override.base_url,
-                api_key=_override.api_key,
-                model=_override.model,
-            )
     return LLMRuntimeConfig(
         base_url=settings.openai_base_url,
         api_key=settings.openai_api_key,
@@ -35,25 +29,67 @@ def get_llm_config() -> LLMRuntimeConfig:
     )
 
 
-def set_llm_config(*, base_url: str, model: str, api_key: str | None = None) -> LLMRuntimeConfig:
-    """Update runtime LLM settings. Empty api_key keeps previous / falls back to env."""
-    current = get_llm_config()
+def allowed_llm_hosts() -> set[str]:
+    settings = get_settings()
+    hosts = {"127.0.0.1", "localhost", "host.docker.internal", "::1"}
+    env_host = urlparse(settings.openai_base_url).hostname
+    if env_host:
+        hosts.add(env_host.lower())
+    for item in settings.llm_base_url_allowlist.split(","):
+        h = item.strip().lower()
+        if h:
+            hosts.add(h)
+    return hosts
+
+
+def validate_llm_base_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("base_url must be http(s) with a host")
+    host = (parsed.hostname or "").lower()
+    if host not in allowed_llm_hosts():
+        raise ValueError(f"base_url host not allowed: {host}")
+    return url.rstrip("/")
+
+
+def get_llm_config(tenant_id: str | None = None) -> LLMRuntimeConfig:
+    env = _env_config()
+    if not tenant_id:
+        return env
+    with _lock:
+        override = _overrides.get(tenant_id)
+        if override is None:
+            return env
+        return LLMRuntimeConfig(
+            base_url=override.base_url,
+            api_key=override.api_key,
+            model=override.model,
+        )
+
+
+def set_llm_config(
+    *,
+    tenant_id: str,
+    base_url: str,
+    model: str,
+    api_key: str | None = None,
+) -> LLMRuntimeConfig:
+    if not tenant_id:
+        raise ValueError("tenant_id required")
+    current = get_llm_config(tenant_id)
     key = api_key if api_key is not None else current.api_key
-    # allow explicit clear with empty string → treat as None (sk-no-auth path)
     if api_key is not None and api_key.strip() == "":
         key = None
+    raw_url = (base_url or current.base_url).strip()
     cfg = LLMRuntimeConfig(
-        base_url=(base_url or current.base_url).rstrip("/"),
+        base_url=validate_llm_base_url(raw_url),
         api_key=key,
         model=(model or current.model).strip(),
     )
     if not cfg.model:
         raise ValueError("model required")
-    if not cfg.base_url:
-        raise ValueError("base_url required")
     with _lock:
-        global _override
-        _override = cfg
+        _overrides[tenant_id] = cfg
     return cfg
 
 

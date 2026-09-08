@@ -29,8 +29,10 @@ class Settings(BaseSettings):
     chunk_size: int = 320
     chunk_overlap: int = 48
     upload_dir: str = "./data/uploads"
+    max_upload_bytes: int = 10 * 1024 * 1024
+    ingest_use_worker: bool = False
+    cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
 
-    # JWT (HS256; share JWT_SECRET with the chat service)
     jwt_secret: str = "change-me-to-a-long-random-string"
     jwt_algorithm: str = "HS256"
 

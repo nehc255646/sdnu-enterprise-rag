@@ -17,7 +17,7 @@ from app.services.retrieval import RetrievalClient, get_retrieval_client
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are an enterprise internship/resume assistant.
+SYSTEM_PROMPT = """You are the 山东师范大学 knowledge-base assistant.
 Answer using ONLY the provided context snippets. If the context is insufficient, say so.
 Cite sources by filename when relevant. Respond in the same language as the user question."""
 
@@ -26,10 +26,22 @@ PROMPT = ChatPromptTemplate.from_messages(
         ("system", SYSTEM_PROMPT),
         (
             "human",
-            "Context:\n{context}\n\nQuestion: {question}",
+            "Context:\n{context}\n\nPrior conversation:\n{history}\n\nQuestion: {question}",
         ),
     ]
 )
+
+
+def _format_history(history: list[dict[str, str]] | None) -> str:
+    if not history:
+        return "(none)"
+    lines = []
+    for turn in history:
+        role = turn.get("role") or "user"
+        content = (turn.get("content") or "").strip()
+        if content:
+            lines.append(f"{role}: {content[:500]}")
+    return "\n".join(lines) if lines else "(none)"
 
 
 def _format_docs(docs: list[dict[str, Any]]) -> str:
@@ -57,16 +69,12 @@ def hits_to_citations(hits: list[dict[str, Any]]) -> list[Citation]:
     ]
 
 
-def get_llm():
-    """ChatOpenAI against OpenAI-compatible endpoint (e.g. Ollama /v1).
-
-    Uses runtime overlay from PUT /llm/config when set; empty key → sk-no-auth.
-    """
+def get_llm(tenant_id: str | None = None):
     from langchain_openai import ChatOpenAI
 
     from app.services.llm_runtime import effective_api_key, get_llm_config
 
-    cfg = get_llm_config()
+    cfg = get_llm_config(tenant_id)
     return ChatOpenAI(
         model=cfg.model,
         api_key=effective_api_key(cfg),
@@ -96,7 +104,7 @@ def build_rag_chain(
         )
 
     try:
-        llm = get_llm()
+        llm = get_llm(tenant_id)
     except Exception as exc:  # noqa: BLE001
         logger.warning("LLM init failed: %s", exc)
         llm = None
@@ -122,6 +130,7 @@ def build_rag_chain(
         | RunnableLambda(
             lambda x: {
                 "context": _format_docs(x["docs"]),
+                "history": "(none)",
                 "question": x["question"] if isinstance(x["question"], str) else x["question"].get("question", ""),
                 "docs": x["docs"],
             }
@@ -141,16 +150,22 @@ def run_rag(
     top_k: int | None = None,
     retrieval: RetrievalClient | None = None,
     authorization: str | None = None,
+    history: list[dict[str, str]] | None = None,
 ) -> tuple[str, list[Citation]]:
     settings = get_settings()
     k = top_k or settings.rag_top_k
     client = retrieval or get_retrieval_client()
     hits = client.search(query=question, tenant_id=tenant_id, top_k=k, authorization=authorization)
     citations = hits_to_citations(hits)
+    prompt_inputs = {
+        "context": _format_docs(hits),
+        "history": _format_history(history),
+        "question": question,
+    }
 
     try:
-        llm = get_llm()
-        prompt_value = PROMPT.invoke({"context": _format_docs(hits), "question": question})
+        llm = get_llm(tenant_id)
+        prompt_value = PROMPT.invoke(prompt_inputs)
         answer = llm.invoke(prompt_value).content
         if not isinstance(answer, str):
             answer = str(answer)
@@ -174,8 +189,8 @@ async def stream_rag(
     top_k: int | None = None,
     retrieval: RetrievalClient | None = None,
     authorization: str | None = None,
+    history: list[dict[str, str]] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
-    """Yield SSE-shaped event dicts: citation / token / error / done."""
     settings = get_settings()
     k = top_k or settings.rag_top_k
     client = retrieval or get_retrieval_client()
@@ -192,8 +207,14 @@ async def stream_rag(
         yield {"event": "citation", "data": c.model_dump()}
 
     try:
-        llm = get_llm()
-        prompt_value = PROMPT.invoke({"context": _format_docs(hits), "question": question})
+        llm = get_llm(tenant_id)
+        prompt_value = PROMPT.invoke(
+            {
+                "context": _format_docs(hits),
+                "history": _format_history(history),
+                "question": question,
+            }
+        )
         answer_parts: list[str] = []
         async for chunk in llm.astream(prompt_value):
             token = chunk.content if hasattr(chunk, "content") else str(chunk)

@@ -16,6 +16,8 @@ from app.services.qdrant_store import delete_by_document, upsert_chunks
 
 logger = logging.getLogger(__name__)
 
+ALLOWED_UPLOAD_SUFFIXES = {".txt", ".md", ".markdown", ".pdf", ".docx"}
+
 # Prefer section / bullet boundaries for KB docs (e.g. 了解山东师范大学)
 _SEPARATORS = [
     "\n【",
@@ -36,7 +38,7 @@ def _load_docs(path: Path):
     suffix = path.suffix.lower()
     if suffix == ".pdf":
         return PyPDFLoader(str(path)).load()
-    if suffix in {".docx", ".doc"}:
+    if suffix == ".docx":
         try:
             return Docx2txtLoader(str(path)).load()
         except Exception:
@@ -46,6 +48,8 @@ def _load_docs(path: Path):
             doc = DocxDocument(str(path))
             text = "\n".join(p.text for p in doc.paragraphs)
             return [LCDocument(page_content=text, metadata={"source": str(path)})]
+    if suffix == ".doc":
+        raise ValueError("legacy .doc is not supported; convert to .docx")
     return TextLoader(str(path), encoding="utf-8").load()
 
 
@@ -78,7 +82,6 @@ def process_document(db: Session, document_id: str) -> None:
         if not texts:
             raise ValueError("no text extracted from document")
 
-        # replace prior vectors for this document (re-ingest / finer split)
         try:
             delete_by_document(doc.id, doc.tenant_id)
         except Exception as exc:  # noqa: BLE001
@@ -110,6 +113,9 @@ def process_document(db: Session, document_id: str) -> None:
         doc.status = IngestStatus.succeeded
         doc.error_message = None
         db.commit()
+        from app.services.retrieve import bump_retrieve_generation
+
+        bump_retrieve_generation(doc.tenant_id)
         logger.info("ingest succeeded document=%s chunks=%s", doc.id, len(point_ids))
     except Exception as exc:  # noqa: BLE001
         logger.exception("ingest failed document=%s", document_id)

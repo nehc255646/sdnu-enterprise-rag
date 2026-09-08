@@ -57,6 +57,15 @@ flowchart LR
 
 前端代理：`/ingest-api` → `backend1`，`/chat-api` → `backend2`（nginx 关闭 SSE buffering）。
 
+## 本机一键启动
+
+```bash
+./start.sh          # Postgres + Qdrant + 后端 + 前端
+./start.sh stop
+```
+
+日志在 `.run/`。Ollama 需已安装并 pull `qwen3-embedding:0.6b`、`qwen2.5:1.5b`。本机已有 Redis 时复用 `:6379`。
+
 ## Compose 快速启动
 
 前置：Docker Compose，以及宿主机 **Ollama**（需 pull 两个模型）：

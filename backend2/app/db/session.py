@@ -1,4 +1,4 @@
-"""SQLAlchemy engine / session factory with graceful SQLite fallback."""
+"""SQLAlchemy engine / session factory."""
 
 from __future__ import annotations
 
@@ -45,11 +45,7 @@ def get_engine():
         _engine = engine
         logger.info("database connected: %s", url.split("@")[-1] if "@" in url else url)
     except Exception as exc:  # noqa: BLE001
-        if url.startswith("sqlite"):
-            raise
-        fallback = "sqlite:///./rag.db"
-        logger.warning("database unreachable (%s); falling back to %s", exc, fallback)
-        _engine = _make_engine(fallback)
+        raise RuntimeError(f"database unreachable: {url.split('@')[-1] if '@' in url else url}: {exc}") from exc
     _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
     return _engine
 

@@ -25,11 +25,17 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(false)
   const [docType, setDocType] = useState<string | undefined>('kb')
   const [uploading, setUploading] = useState(false)
+  const [page, setPage] = useState(1)
+  const pageSize = 50
 
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await listDocuments({ doc_type: docType })
+      const data = await listDocuments({
+        doc_type: docType,
+        offset: (page - 1) * pageSize,
+        limit: pageSize,
+      })
       setItems(data.items || [])
       setTotal(data.total || 0)
     } catch (e) {
@@ -37,7 +43,7 @@ export default function DocumentsPage() {
     } finally {
       setLoading(false)
     }
-  }, [docType])
+  }, [docType, page])
 
   useEffect(() => { void refresh() }, [refresh])
 
@@ -72,7 +78,7 @@ export default function DocumentsPage() {
             placeholder="doc_type"
             style={{ width: 140 }}
             value={docType}
-            onChange={(v) => setDocType(v)}
+            onChange={(v) => { setPage(1); setDocType(v) }}
             options={[
               { value: 'kb', label: 'kb' },
               { value: 'resume', label: 'resume' },
@@ -96,7 +102,11 @@ export default function DocumentsPage() {
               try {
                 const sync = f.size <= SYNC_THRESHOLD_BYTES
                 const res = await uploadDocument(f, docType || 'kb', sync)
-                message.success(sync ? '上传并同步入库成功' : '已提交异步入库，稍后刷新查看状态')
+                if (res?.status === 'failed') {
+                  message.error(res.message || '入库失败')
+                } else {
+                  message.success(sync ? '上传并同步入库成功' : '已提交异步入库，稍后刷新查看状态')
+                }
                 if (!sync && res?.document_id) {
                   // soft refresh soon for async jobs
                   setTimeout(() => { void refresh() }, 1500)
@@ -124,7 +134,13 @@ export default function DocumentsPage() {
         loading={loading}
         columns={columns}
         dataSource={items}
-        pagination={{ total, pageSize: 50, hideOnSinglePage: true }}
+        pagination={{
+          current: page,
+          total,
+          pageSize,
+          hideOnSinglePage: true,
+          onChange: (p) => setPage(p),
+        }}
       />
     </Card>
   )

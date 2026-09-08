@@ -1,5 +1,4 @@
 from pathlib import Path
-import shutil
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
@@ -19,11 +18,40 @@ from app.api.schemas import (
 from app.core.config import get_settings
 from app.core.db import get_db
 from app.models.entities import DocType, Document, IngestStatus
-from app.services.ingest import process_document
+from app.services.ingest import ALLOWED_UPLOAD_SUFFIXES, process_document
 from app.services.redis_queue import enqueue_ingest
 from app.services.retrieve import retrieve
 
 router = APIRouter()
+
+_READ_CHUNK = 1024 * 64
+
+
+def _tenant_upload_dir(upload_dir: str, tenant_id: str) -> Path:
+    root = Path(upload_dir).resolve()
+    dest_dir = (root / tenant_id).resolve()
+    if dest_dir != root and root not in dest_dir.parents:
+        raise HTTPException(status_code=400, detail="invalid upload path")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    return dest_dir
+
+
+def _write_upload(file: UploadFile, dest: Path, max_bytes: int) -> int:
+    written = 0
+    with dest.open("wb") as out:
+        while True:
+            chunk = file.file.read(_READ_CHUNK)
+            if not chunk:
+                break
+            written += len(chunk)
+            if written > max_bytes:
+                dest.unlink(missing_ok=True)
+                raise HTTPException(status_code=413, detail=f"file exceeds {max_bytes} bytes")
+            out.write(chunk)
+    if written <= 0:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail="empty file")
+    return written
 
 
 def _doc_to_status(doc: Document) -> IngestStatusResponse:
@@ -98,13 +126,17 @@ async def create_ingest(
     db: Session = Depends(get_db),
 ):
     settings = get_settings()
-    upload_root = Path(settings.upload_dir) / tenant_id
-    upload_root.mkdir(parents=True, exist_ok=True)
-    doc_id = str(uuid.uuid4())
     safe_name = Path(file.filename or "upload.bin").name
+    suffix = Path(safe_name).suffix.lower()
+    if suffix not in ALLOWED_UPLOAD_SUFFIXES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"unsupported file type {suffix or '(none)'}; allowed: {sorted(ALLOWED_UPLOAD_SUFFIXES)}",
+        )
+    upload_root = _tenant_upload_dir(settings.upload_dir, tenant_id)
+    doc_id = str(uuid.uuid4())
     dest = upload_root / f"{doc_id}_{safe_name}"
-    with dest.open("wb") as out:
-        shutil.copyfileobj(file.file, out)
+    _write_upload(file, dest, settings.max_upload_bytes)
 
     doc = Document(
         id=doc_id,
@@ -119,10 +151,22 @@ async def create_ingest(
 
     if sync:
         process_document(db, doc_id)
-        return IngestCreateResponse(document_id=doc_id, status="processing_done", message="sync ingest finished")
+        doc = db.get(Document, doc_id)
+        if doc is None or doc.status == IngestStatus.failed:
+            raise HTTPException(
+                status_code=422,
+                detail=(doc.error_message if doc else None) or "ingest failed",
+            )
+        return IngestCreateResponse(
+            document_id=doc_id,
+            status=doc.status.value,
+            message="sync ingest finished",
+        )
 
-    enqueue_ingest({"document_id": doc_id, "tenant_id": tenant_id})
-    background_tasks.add_task(_bg_process, doc_id)
+    if settings.ingest_use_worker:
+        enqueue_ingest({"document_id": doc_id, "tenant_id": tenant_id})
+    else:
+        background_tasks.add_task(_bg_process, doc_id)
     return IngestCreateResponse(document_id=doc_id, status="pending", message="ingest job queued")
 
 

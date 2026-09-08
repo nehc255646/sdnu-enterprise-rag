@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import Depends, Header, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, validate_tenant_id
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -20,7 +20,6 @@ def require_auth(
     x_tenant_id: Annotated[str, Depends(require_tenant_header)],
     creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> str:
-    """Require Bearer JWT; X-Tenant-Id must match token tenant_id. Returns tenant_id."""
     if creds is None or not creds.credentials:
         raise HTTPException(status_code=401, detail="Authorization Bearer token required")
     try:
@@ -33,7 +32,10 @@ def require_auth(
         raise HTTPException(status_code=401, detail="token missing tenant_id claim")
     if str(token_tenant) != x_tenant_id:
         raise HTTPException(status_code=403, detail="X-Tenant-Id does not match token tenant_id")
-    return x_tenant_id
+    try:
+        return validate_tenant_id(x_tenant_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid tenant_id") from None
 
 
 require_tenant = require_auth

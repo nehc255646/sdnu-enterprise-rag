@@ -33,8 +33,10 @@ export default function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const sessionIdRef = useRef<string | null>(null)
+  const sendingRef = useRef(false)
 
   useEffect(() => { sessionIdRef.current = sessionId }, [sessionId])
+  useEffect(() => { sendingRef.current = sending }, [sending])
 
   function abortStream() {
     abortRef.current?.abort()
@@ -42,10 +44,11 @@ export default function ChatPage() {
   }
 
   async function loadHistory(id: string) {
+    if (sendingRef.current) return
     setLoadingHistory(true)
     try {
       const detail = await getSession(id)
-      if (sessionIdRef.current !== id) return
+      if (sessionIdRef.current !== id || sendingRef.current) return
       setMessages(
         (detail.messages || []).map((m) => ({
           id: m.id,
@@ -81,6 +84,7 @@ export default function ChatPage() {
   useEffect(() => { void refreshSessions() }, [])
 
   useEffect(() => {
+    if (sendingRef.current) return
     abortStream()
     setSending(false)
     if (!sessionId) {
@@ -88,7 +92,9 @@ export default function ChatPage() {
       return
     }
     void loadHistory(sessionId)
-    return () => { abortStream() }
+    return () => {
+      if (!sendingRef.current) abortStream()
+    }
   }, [sessionId])
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, sending])
@@ -122,6 +128,8 @@ export default function ChatPage() {
     const text = input.trim()
     if (!text || sending) return
     let sid = sessionId
+    sendingRef.current = true
+    setSending(true)
     if (!sid) {
       try {
         const s = await createSession(text.slice(0, 20))
@@ -129,6 +137,8 @@ export default function ChatPage() {
         setSessionId(sid)
         await refreshSessions(sid)
       } catch (e) {
+        sendingRef.current = false
+        setSending(false)
         message.error(e instanceof Error ? e.message : '创建会话失败')
         return
       }
@@ -142,7 +152,6 @@ export default function ChatPage() {
     const assistantId = 'a-' + Date.now()
     setMessages((prev) => [...prev, userMsg, { id: assistantId, role: 'assistant', content: '', citations: [] }])
     setInput('')
-    setSending(true)
 
     const citations: Citation[] = []
     try {
@@ -170,6 +179,7 @@ export default function ChatPage() {
       }
     } finally {
       if (abortRef.current === controller) abortRef.current = null
+      sendingRef.current = false
       setSending(false)
     }
   }

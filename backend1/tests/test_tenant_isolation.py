@@ -119,3 +119,22 @@ def test_cross_tenant_no_leak(client: TestClient):
     )
     assert hit_b.status_code == 200
     assert hit_b.json()["hits"] == []
+
+
+def test_invalid_tenant_path_400(client: TestClient):
+    tok = _token("../tmp")
+    r = client.get(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {tok}", "X-Tenant-Id": "../tmp"},
+    )
+    assert r.status_code == 400
+
+
+def test_legacy_doc_rejected(client: TestClient):
+    r = client.post(
+        "/api/v1/ingest",
+        headers={"X-Tenant-Id": "tenant-a", "Authorization": f"Bearer {_token('tenant-a')}"},
+        data={"doc_type": "kb", "sync": "true"},
+        files={"file": ("legacy.doc", b"not-a-real-doc", "application/msword")},
+    )
+    assert r.status_code == 400

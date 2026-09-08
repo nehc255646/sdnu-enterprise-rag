@@ -1,16 +1,43 @@
-"""Chat rate limiting via Redis INCR; degrade = allow when Redis down."""
+"""Chat/auth rate limiting via Redis INCR, with process-local fallback."""
 
 from __future__ import annotations
 
 import logging
+import time
+from threading import Lock
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Request, status
 
 from app.core.config import get_settings
 from app.core.deps import CurrentUser
 from app.services.cache import get_redis, rate_limit_incr
 
 logger = logging.getLogger(__name__)
+
+_local_lock = Lock()
+_local_buckets: dict[str, tuple[int, float]] = {}
+
+
+def _local_incr(key: str, window_seconds: int = 60) -> int:
+    now = time.monotonic()
+    with _local_lock:
+        count, start = _local_buckets.get(key, (0, now))
+        if now - start >= window_seconds:
+            count, start = 0, now
+        count += 1
+        _local_buckets[key] = (count, start)
+        return count
+
+
+def _incr(key: str, window_seconds: int = 60) -> int:
+    try:
+        n = rate_limit_incr(key, window_seconds=window_seconds)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("redis rate limit failed, using local: %s", exc)
+        n = 0
+    if n == 0:
+        return _local_incr(key, window_seconds)
+    return n
 
 
 def rate_limit_status() -> dict:
@@ -23,9 +50,9 @@ def rate_limit_status() -> dict:
     if client is None:
         return {
             "enabled": True,
-            "backend": "disabled",
-            "ok": False,
-            "detail": "optional: redis unreachable — rate limit degraded (allow)",
+            "backend": "local",
+            "ok": True,
+            "detail": f"redis unreachable — process-local limit={settings.rate_limit_chat_per_minute}/min",
         }
     try:
         client.ping()
@@ -45,26 +72,29 @@ def rate_limit_status() -> dict:
 
 
 def enforce_chat_rate_limit(user: CurrentUser) -> None:
-    """Increment Redis counter for user; raise 429 when over limit.
-
-    When rate limiting is disabled or Redis is unreachable, allow the request
-    (do not 500).
-    """
     settings = get_settings()
     if not settings.rate_limit_enabled:
         return
     limit = max(1, int(settings.rate_limit_chat_per_minute))
     key = f"rag:ratelimit:chat:{user.tenant_id}:{user.id}"
-    try:
-        n = rate_limit_incr(key, window_seconds=60)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("rate limit check failed, allowing: %s", exc)
-        return
-    # rate_limit_incr returns 0 when Redis unavailable → degrade allow
-    if n == 0:
-        return
+    n = _incr(key, window_seconds=60)
     if n > limit:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"chat rate limit exceeded: {limit} requests per minute",
+        )
+
+
+def enforce_auth_rate_limit(request: Request) -> None:
+    settings = get_settings()
+    if not settings.rate_limit_enabled:
+        return
+    limit = max(1, int(settings.rate_limit_auth_per_minute))
+    host = request.client.host if request.client else "unknown"
+    key = f"rag:ratelimit:auth:{host}"
+    n = _incr(key, window_seconds=60)
+    if n > limit:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"auth rate limit exceeded: {limit} requests per minute",
         )

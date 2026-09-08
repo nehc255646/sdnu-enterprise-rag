@@ -15,8 +15,29 @@ from app.services.redis_queue import get_redis
 logger = logging.getLogger(__name__)
 
 
-def _cache_key(tenant_id: str, query: str, top_k: int, doc_type: str | None) -> str:
-    raw = f"{tenant_id}|{query}|{top_k}|{doc_type or ''}"
+def _generation_key(tenant_id: str) -> str:
+    return f"rag:retrieve:gen:{tenant_id}"
+
+
+def bump_retrieve_generation(tenant_id: str) -> None:
+    client = get_redis()
+    if client is None:
+        return
+    try:
+        client.incr(_generation_key(tenant_id))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("retrieve generation bump failed: %s", exc)
+
+
+def _cache_generation(client, tenant_id: str) -> str:
+    try:
+        return str(client.get(_generation_key(tenant_id)) or "0")
+    except Exception:
+        return "0"
+
+
+def _cache_key(tenant_id: str, query: str, top_k: int, doc_type: str | None, generation: str) -> str:
+    raw = f"{tenant_id}|{generation}|{query}|{top_k}|{doc_type or ''}"
     return "rag:retrieve:" + hashlib.sha256(raw.encode()).hexdigest()
 
 
@@ -29,8 +50,9 @@ def retrieve(
     use_cache: bool = True,
 ) -> list[dict[str, Any]]:
     settings = get_settings()
-    key = _cache_key(tenant_id, query, top_k, doc_type)
     client = get_redis() if use_cache else None
+    generation = _cache_generation(client, tenant_id) if client is not None else "0"
+    key = _cache_key(tenant_id, query, top_k, doc_type, generation)
     if client is not None:
         cached = client.get(key)
         if cached:

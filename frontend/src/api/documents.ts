@@ -1,7 +1,7 @@
 import { ingestFetch, authHeaders, INGEST_BASE, handleUnauthorized } from './client'
 import type { DocumentListResponse } from '../types'
 
-export const ALLOWED_UPLOAD_EXT = ['.txt', '.md', '.markdown', '.pdf', '.doc', '.docx']
+export const ALLOWED_UPLOAD_EXT = ['.txt', '.md', '.markdown', '.pdf', '.docx']
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 export const SYNC_THRESHOLD_BYTES = 1 * 1024 * 1024
 
@@ -16,10 +16,17 @@ export function validateUploadFile(file: File): string | null {
   return null
 }
 
-export async function listDocuments(params?: { doc_type?: string; status?: string }) {
+export async function listDocuments(params?: {
+  doc_type?: string
+  status?: string
+  offset?: number
+  limit?: number
+}) {
   const q = new URLSearchParams()
   if (params?.doc_type) q.set('doc_type', params.doc_type)
   if (params?.status) q.set('status', params.status)
+  if (params?.offset != null) q.set('offset', String(params.offset))
+  if (params?.limit != null) q.set('limit', String(params.limit))
   const qs = q.toString()
   const path = '/api/v1/documents' + (qs ? '?' + qs : '')
   return (await ingestFetch(path)) as DocumentListResponse

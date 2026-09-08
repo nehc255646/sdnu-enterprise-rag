@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import CurrentUser, get_current_user
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.rate_limit import enforce_auth_rate_limit
+from app.core.security import create_access_token, hash_password, validate_tenant_id, verify_password
 from app.db.models import User
 from app.db.session import get_db
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserOut
@@ -17,8 +18,13 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def register(body: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    tenant_id = (body.tenant_id or str(uuid.uuid4())).strip()
+def register(body: RegisterRequest, request: Request, db: Session = Depends(get_db)) -> TokenResponse:
+    enforce_auth_rate_limit(request)
+    raw_tenant = (body.tenant_id or str(uuid.uuid4())).strip()
+    try:
+        tenant_id = validate_tenant_id(raw_tenant)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid tenant_id") from None
     existing = (
         db.query(User)
         .filter(User.tenant_id == tenant_id, User.email == body.email.lower())
@@ -41,10 +47,15 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> TokenRespo
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)) -> TokenResponse:
+    enforce_auth_rate_limit(request)
+    try:
+        tenant_id = validate_tenant_id(body.tenant_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid tenant_id") from None
     user = (
         db.query(User)
-        .filter(User.tenant_id == body.tenant_id.strip(), User.email == body.email.lower())
+        .filter(User.tenant_id == tenant_id, User.email == body.email.lower())
         .one_or_none()
     )
     if user is None or not verify_password(body.password, user.hashed_password):
