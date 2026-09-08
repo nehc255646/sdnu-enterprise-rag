@@ -1,2 +1,2 @@
-"""rag-backend1: ingest + vector retrieval for enterprise resume RAG."""
+"""Ingest and vector retrieval for the SDNU knowledge-base RAG service."""
 __version__ = "0.1.0"
