@@ -1,5 +1,7 @@
 # 山东师范大学知识库问答（RAG）
 
+English: [README.en.md](./README.en.md)
+
 主题：山东师范大学知识库问答。多租户（`tenant_id` / `X-Tenant-Id`），演示租户：`sdnu-demo`。
 
 ## 结构
@@ -41,6 +43,11 @@ Ollama 不进 compose，容器通过 `host.docker.internal:11434` 访问宿主�
 
 各服务接入细节见 `backend1/COMPOSE.md`、`backend2/COMPOSE.md`、`frontend/COMPOSE.md`。
 
+### 嵌套 / 受限 Docker 环境
+
+在嵌套 Docker 或桥接受限的环境里，默认 `overlay2` 或 iptables FORWARD 可能导致容器间 DNS/TCP 不通。若服务卡在连库，可尝试 `/etc/docker/daemon.json` 使用 `storage-driver: vfs`、确认容器互通，并让 Ollama 监听 `0.0.0.0:11434`（不要只绑 `127.0.0.1`），以便 `host.docker.internal` 可用。
+
+
 ## 快速启动（本机无 Docker 时）
 
 ```bash
@@ -57,9 +64,9 @@ OpenAPI：`http://127.0.0.1:8001/docs`、`http://127.0.0.1:8002/docs`
 
 ## 契约要点
 
-- 业务请求头：`X-Tenant-Id`（必填）；后端2 另需 `Authorization: Bearer <JWT>`
-- 后端1：`POST /api/v1/ingest`、`GET /api/v1/documents`、`POST /api/v1/retrieve`
-- 后端2：登录 / 会话 / `/chat/stream`（SSE：`citation`/`token`/`error`/`done`）
+- 业务请求头：`X-Tenant-Id`（必填）；backend2 另需 `Authorization: Bearer <JWT>`
+- backend1：`POST /api/v1/ingest`、`GET /api/v1/documents`、`POST /api/v1/retrieve`
+- backend2：登录 / 会话 / `/chat/stream`（SSE：`citation`/`token`/`error`/`done`）
 
 ## Frontend
 
