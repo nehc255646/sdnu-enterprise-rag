@@ -1,4 +1,4 @@
-# frontend · compose 接入说明（给 @计划）
+# frontend · Docker Compose 接入
 
 ## 产物
 
