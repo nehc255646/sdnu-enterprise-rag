@@ -3,14 +3,15 @@ import { ConfigProvider, theme as antTheme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 
 const STORAGE_KEY = 'sdnu_rag_accent'
-export const DEFAULT_ACCENT = '#1677ff'
+/** SDNU school red (approx. from official brand guide) */
+export const DEFAULT_ACCENT = '#E60012'
 
 export const ACCENT_PRESETS = [
+  { label: '校红', value: '#E60012' },
+  { label: '校蓝', value: '#004B87' },
   { label: '默认蓝', value: '#1677ff' },
   { label: '青绿', value: '#13c2c2' },
   { label: '极光绿', value: '#52c41a' },
-  { label: '日落橙', value: '#fa8c16' },
-  { label: '洋红', value: '#eb2f96' },
   { label: '酱紫', value: '#722ed1' },
 ] as const
 

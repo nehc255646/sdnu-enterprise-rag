@@ -17,8 +17,20 @@ export default function AppLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#ffffff' }}>
-      <Sider breakpoint="lg" collapsedWidth={64} theme="light" style={{ borderRight: '1px solid #f0f0f0', background: '#ffffff' }}>
-        <div style={{ padding: 16, fontWeight: 700 }}>山师大 RAG</div>
+      <Sider breakpoint="lg" collapsedWidth={72} theme="light" style={{ borderRight: '1px solid #f0f0f0', background: '#ffffff' }}>
+        <div style={{ padding: '16px 12px 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img src="/sdnu-emblem-64.png" alt="山东师范大学校徽" width={40} height={40} style={{ flexShrink: 0 }} />
+          <div style={{ minWidth: 0, lineHeight: 1.25 }}>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>山东师范大学</div>
+            <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>知识库问答</div>
+          </div>
+        </div>
+        <Typography.Paragraph
+          type="secondary"
+          style={{ margin: '0 12px 12px', fontSize: 12, lineHeight: 1.4 }}
+        >
+          弘德明志，博学笃行
+        </Typography.Paragraph>
         <Menu
           mode="inline"
           selectedKeys={[key]}
@@ -32,7 +44,7 @@ export default function AppLayout() {
       </Sider>
       <Layout style={{ background: '#ffffff' }}>
         <Header style={{ background: '#ffffff', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingInline: 24 }}>
-          <Typography.Text type="secondary">知识库问答 Demo</Typography.Text>
+          <Typography.Text type="secondary">了解山东师范大学 · 知识库问答</Typography.Text>
           <Space>
             {auth?.tenant_id && <Tag color="processing">{auth.tenant_id}</Tag>}
             <Typography.Text>{auth?.email || auth?.user_id}</Typography.Text>

@@ -41,8 +41,15 @@ export default function LoginPage() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#ffffff' }}>
-      <Card style={{ width: 420 }} title="山师大知识库 · 登录">
-        <Typography.Paragraph type="secondary">
+      <Card style={{ width: 440 }}>
+        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <img src="/sdnu-emblem-128.png" alt="山东师范大学校徽" width={72} height={72} />
+          <Typography.Title level={4} style={{ margin: '12px 0 4px' }}>
+            山东师范大学知识库
+          </Typography.Title>
+          <Typography.Text type="secondary">弘德明志，博学笃行</Typography.Text>
+        </div>
+        <Typography.Paragraph type="secondary" style={{ textAlign: 'center' }}>
           Demo 租户建议使用 <Typography.Text code>{defaultTenant}</Typography.Text>
         </Typography.Paragraph>
         <Tabs

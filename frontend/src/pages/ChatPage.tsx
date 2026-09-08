@@ -216,13 +216,22 @@ export default function ChatPage() {
       </Card>
 
       <Card
-        title="知识库对话"
+        title="山东师范大学 · 知识库对话"
         styles={{ body: { display: 'flex', flexDirection: 'column', height: '70vh' } }}
       >
         <div style={{ flex: 1, overflow: 'auto', marginBottom: 12 }}>
           <Spin spinning={loadingHistory}>
             {messages.length === 0 && !loadingHistory && (
-              <Empty description="问问山师大：校训、校区、招生就业等" style={{ marginTop: 80 }} />
+              <Empty
+              style={{ marginTop: 80 }}
+              description={
+                <span>
+                  问问山东师范大学：校训、宿舍食堂、招生政策、科研平台…
+                  <br />
+                  <Typography.Text type="secondary">弘德明志，博学笃行</Typography.Text>
+                </span>
+              }
+            />
             )}
             {messages.map((m) => (
               <div key={m.id} style={{ marginBottom: 16, display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
