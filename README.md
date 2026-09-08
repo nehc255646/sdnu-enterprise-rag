@@ -1,4 +1,4 @@
-# 了解山东师范大学 · 企业级 RAG
+# 山东师范大学知识库问答（RAG）
 
 主题：山东师范大学知识库问答。多租户（`tenant_id` / `X-Tenant-Id`），演示租户：`sdnu-demo`。
 
@@ -17,6 +17,25 @@
 - Redis（缓存 / 队列）
 - Qdrant collection：`sdnu_chunks`
 - 密钥走环境变量（见各服务 `.env.example`）
+
+## Docker Compose（一键演示）
+
+宿主机先装好并跑着 Ollama，至少 pull：`qwen3-embedding:0.6b`、`qwen2.5:1.5b`。
+
+```bash
+cp .env.example .env   # 改 JWT_SECRET
+docker compose up -d --build
+```
+
+起来后：
+
+- 前端：http://127.0.0.1:5173
+- backend1：http://127.0.0.1:8001/docs
+- backend2：http://127.0.0.1:8002/docs
+
+演示租户 `sdnu-demo`。语料在 `knowledge/sdnu/`；首次可用 demo 账号灌库（或按各服务 README）。Ollama 不进 compose，容器通过 `host.docker.internal:11434` 访问宿主机。
+
+各服务接入细节见 `backend1/COMPOSE.md`、`backend2/COMPOSE.md`、`frontend/COMPOSE.md`。
 
 ## 快速启动（本机无 Docker 时）
 
