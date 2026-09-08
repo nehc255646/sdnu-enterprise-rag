@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     qdrant_collection: str = "sdnu_chunks"
     qdrant_path: str | None = None
 
-    # Retrieval: prefer 后端1 HTTP when local Qdrant path is locked by 后端1
+    # Retrieval: prefer ingest HTTP when local Qdrant path is held by ingest
     retrieval_backend: str = "backend1"  # backend1 | qdrant
     backend1_base_url: str = "http://127.0.0.1:8001"
 
@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     openai_base_url: str = "http://127.0.0.1:11434/v1"
     openai_model: str = "qwen2.5:1.5b"
 
-    # Embeddings (must match 后端1 ingest for direct Qdrant mode)
+    # Embeddings (must match ingest model for direct Qdrant mode)
     embedding_provider: str = "ollama"  # ollama | openai | huggingface | hash
     embedding_model: str = "qwen3-embedding:0.6b"
     ollama_base_url: str = "http://127.0.0.1:11434"

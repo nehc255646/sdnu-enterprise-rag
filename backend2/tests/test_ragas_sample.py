@@ -1,4 +1,4 @@
-"""Ragas evaluation sample for 后端2 RAG quality checks.
+"""Ragas evaluation sample for RAG quality checks.
 
 - Offline smoke always runs (token-overlap stub, no live LLM).
 - `test_ragas_evaluate_live_ollama` calls real `ragas.evaluate` against local

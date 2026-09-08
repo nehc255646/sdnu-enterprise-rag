@@ -1,6 +1,6 @@
 """Swappable embedding backend: openai | huggingface | ollama | hash.
 
-Aligned with 后端1 so query vectors match ingested chunks (qwen3-embedding:0.6b / 1024-dim).
+Query vectors must match ingested chunks (e.g. qwen3-embedding:0.6b / 1024-dim).
 """
 
 from __future__ import annotations

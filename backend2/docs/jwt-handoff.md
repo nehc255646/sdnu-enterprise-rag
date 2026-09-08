@@ -1,6 +1,6 @@
-# JWT 对接说明（后端1 / 前端 → 后端2）
+# JWT 集成说明（客户端 / ingest 服务 → chat & auth）
 
-后端2 签发并校验 JWT。后端1 若需代表用户调用受保护接口，或前端登录后携带同一 token，请按下列约定对接。
+本服务（backend2）签发并校验 JWT。ingest 服务或其他后端若需代表用户调用受保护接口，或前端登录后携带同一 token，请按下列约定对接。
 
 ## 算法与密钥
 
@@ -56,14 +56,14 @@ X-Tenant-Id: <tenant_id>
 
 公开路由（无需 JWT）：`POST /auth/register`、`POST /auth/login`、`GET /health`。
 
-## 后端1 对接建议
+## ingest 服务 / 其他后端对接
 
-1. 与后端2 共用同一 `JWT_SECRET` / `JWT_ALGORITHM`（同一部署密钥源）。
+1. 与本服务共用同一 `JWT_SECRET` / `JWT_ALGORITHM`（同一部署密钥源）。
 2. 入库 / 检索请求若需用户上下文：转发前端的 `Authorization` + `X-Tenant-Id`，或自行用相同密钥签发含 `sub` + `tenant_id` 的 token。
 3. Qdrant payload 的 `tenant_id` 必须与 JWT / `X-Tenant-Id` 一致，避免跨租户泄漏。
-4. 本地调试可用后端2 `POST /api/v1/auth/login` 拿 `access_token`，再调后端1 受保护接口验证。
+4. 本地调试可用本服务 `POST /api/v1/auth/login` 拿 `access_token`，再调 ingest 或其他受保护接口验证。
 
-## 校验伪代码（后端1）
+## 校验伪代码
 
 ```python
 from jose import jwt
@@ -74,4 +74,4 @@ tenant_id = payload["tenant_id"]
 assert header_x_tenant_id == tenant_id
 ```
 
-签发逻辑参考后端2：`app/core/security.py`（`create_access_token` / `decode_access_token`）。
+签发逻辑参考本服务：`app/core/security.py`（`create_access_token` / `decode_access_token`）。

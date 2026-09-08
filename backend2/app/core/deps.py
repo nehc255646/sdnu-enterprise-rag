@@ -46,7 +46,7 @@ def get_current_user(
     if not user_id or not tenant_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="token missing sub/tenant_id")
 
-    # Required on protected routes (aligns with 后端1); must match JWT tenant_id
+    # Required on protected routes; must match JWT tenant_id
     if not x_tenant_id or not str(x_tenant_id).strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

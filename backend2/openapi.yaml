@@ -1,18 +1,18 @@
 openapi: 3.1.0
 info:
-  title: RAG Enterprise — 后端2 Auth & Chat
+  title: 山师大知识库问答 — Chat & Auth (backend2)
   version: 0.1.0
   description: >
     Canonical OpenAPI is served live at GET /openapi.json when the app runs.
-    This file is a skeleton pointer for frontend / 后端1 integration.
-    Qdrant collection: sdnu_chunks (aligned with 后端1).
+    This file is a skeleton pointer for frontend and ingest-service integration.
+    Qdrant collection: sdnu_chunks (must match ingest).
     Protected routes require Authorization: Bearer <JWT> and X-Tenant-Id
     (OpenAPI required=true; must match JWT tenant_id; empty→400, mismatch→403).
     Live schema: GET /openapi.json (Header(..., alias=X-Tenant-Id)).
-    JWT handoff for 后端1: docs/jwt-handoff.md (HS256, sub+tenant_id, JWT_SECRET).
+    JWT handoff: docs/jwt-handoff.md (HS256, sub+tenant_id, JWT_SECRET).
 servers:
   - url: http://localhost:8002
-    description: local 后端2
+    description: local chat & auth (backend2)
 components:
   securitySchemes:
     bearerAuth:
@@ -69,4 +69,3 @@ paths:
     put:
       tags: [llm]
       summary: Hot-update base_url / api_key? / model; health reflects immediately
-

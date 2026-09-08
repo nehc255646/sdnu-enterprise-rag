@@ -1,7 +1,7 @@
-"""RetrievalClient — tenant-scoped search via 后端1 HTTP or direct Qdrant.
+"""RetrievalClient — tenant-scoped search via ingest HTTP or direct Qdrant.
 
-Collection name defaults to `sdnu_chunks` (shared with 后端1 via QDRANT_COLLECTION).
-When 后端1 uses local Qdrant path (./data/qdrant-b1), prefer RETRIEVAL_BACKEND=backend1
+Collection name defaults to `sdnu_chunks` (shared via QDRANT_COLLECTION).
+When ingest holds a local Qdrant path, prefer RETRIEVAL_BACKEND=backend1
 so we call POST {backend1}/api/v1/retrieve with forwarded Authorization + X-Tenant-Id.
 """
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class RetrievalClient(ABC):
-    """Interface for vector retrieval. 后端1 owns ingest; 后端2 only queries."""
+    """Interface for vector retrieval. This service queries only; ingest owns upload."""
 
     @abstractmethod
     def search(
@@ -39,7 +39,7 @@ class RetrievalClient(ABC):
 
 
 class Backend1RetrievalClient(RetrievalClient):
-    """Call 后端1 POST /api/v1/retrieve with forwarded Bearer + X-Tenant-Id."""
+    """Call ingest POST /api/v1/retrieve with forwarded Bearer + X-Tenant-Id."""
 
     def search(
         self,
@@ -206,7 +206,7 @@ class QdrantRetrievalClient(RetrievalClient):
 
 
 class RoutingRetrievalClient(RetrievalClient):
-    """Prefer 后端1 HTTP retrieve when configured; fall back to direct Qdrant if server is up."""
+    """Prefer ingest HTTP retrieve when configured; fall back to direct Qdrant if server is up."""
 
     def __init__(self) -> None:
         self._backend1 = Backend1RetrievalClient()

@@ -1,9 +1,9 @@
-# backend2 · Docker Compose 接入
+# backend2 · Docker Compose
 
 ## 产物
 
 - `backend2/Dockerfile`（Python 3.12 slim + `requirements.txt` / pip，非 uv）
-- 依赖服务：`backend1`、`postgres`、`redis`（必选 depends_on）；`qdrant` **可选**（当 `RETRIEVAL_BACKEND=backend1` 时检索走后端1，不直连 Qdrant）
+- 依赖服务：`backend1`、`postgres`、`redis`（必选 depends_on）；`qdrant` **可选**（当 `RETRIEVAL_BACKEND=backend1` 时检索走 ingest HTTP，不直连 Qdrant）
 - LLM / Embedding：宿主机 Ollama（`qwen2.5:1.5b` + `qwen3-embedding:0.6b`），容器内经 `host.docker.internal`
 
 ## 建议环境变量

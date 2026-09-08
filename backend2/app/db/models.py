@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models shared conceptually with 后端1 metadata."""
+"""SQLAlchemy ORM models (users, chat, document metadata for citations)."""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ class User(Base):
 
 
 class Document(Base):
-    """Ingest metadata owned by 后端1; present for joins / citations."""
+    """Ingest document metadata; present for joins / citations."""
 
     __tablename__ = "documents"
 

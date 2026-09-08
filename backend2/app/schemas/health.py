@@ -12,7 +12,7 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     dependencies: list[DependencyStatus] = []
-    # Config exposure (aligned with 后端1 / Nehchat-style ops)
+    # Runtime config exposure for ops / health dashboards
     embedding_provider: str | None = None
     embedding_model: str | None = None
     llm_base_url: str | None = None

@@ -1,4 +1,4 @@
-"""FastAPI entrypoint — 后端2: auth / sessions / RAG chat orchestration."""
+"""FastAPI entrypoint — chat & auth service (JWT, sessions, RAG orchestration)."""
 
 from __future__ import annotations
 
@@ -33,12 +33,12 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
-        title="RAG Enterprise — 后端2 Auth & Chat",
+        title="山师大知识库问答 — Chat & Auth",
         version="0.1.0",
         description=(
-            "Enterprise internship/resume RAG (后端2): JWT auth + tenant isolation, "
+            "Chat & auth service: JWT auth + tenant isolation, "
             "chat sessions, LangChain LCEL orchestration, Redis cache, Qdrant retrieval "
-            "on collection sdnu_chunks (ingest/upload owned by 后端1). "
+            "on collection sdnu_chunks (ingest/upload via ingest service, default :8001). "
             "Protected routes require Authorization Bearer and X-Tenant-Id."
         ),
         lifespan=lifespan,
@@ -62,7 +62,7 @@ def create_app() -> FastAPI:
     def root():
         return {
             "service": settings.app_name,
-            "role": "后端2",
+            "role": "chat-auth",
             "docs": "/docs",
             "openapi": "/openapi.json",
             "health": f"{prefix}/health",
