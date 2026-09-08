@@ -1,4 +1,4 @@
-"""LLM config — Nehchat-style OpenAI-compat hot switch."""
+"""LLM config — OpenAI-compatible endpoint hot switch."""
 
 from __future__ import annotations
 

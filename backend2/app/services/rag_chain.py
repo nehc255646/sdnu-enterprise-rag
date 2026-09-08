@@ -58,7 +58,7 @@ def hits_to_citations(hits: list[dict[str, Any]]) -> list[Citation]:
 
 
 def get_llm():
-    """ChatOpenAI against OpenAI-compat endpoint (Ollama /v1, Nehchat, etc.).
+    """ChatOpenAI against OpenAI-compatible endpoint (e.g. Ollama /v1).
 
     Uses runtime overlay from PUT /llm/config when set; empty key → sk-no-auth.
     """
