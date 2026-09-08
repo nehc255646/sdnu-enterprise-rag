@@ -1,0 +1,100 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: rag
+      POSTGRES_DB: rag
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag -d rag"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.5
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "6333:6333"
+
+  backend1:
+    build: ./backend1
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://rag:rag@postgres:5432/rag
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_PATH: ""
+      QDRANT_COLLECTION: sdnu_chunks
+      EMBEDDING_PROVIDER: ollama
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_EMBEDDING_MODEL: qwen3-embedding:0.6b
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-prod}
+      JWT_ALGORITHM: HS256
+      UPLOAD_DIR: /app/data/uploads
+    volumes:
+      - b1_uploads:/app/data/uploads
+      - ./knowledge/sdnu:/app/knowledge/sdnu:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      redis:
+        condition: service_started
+
+  backend2:
+    build: ./backend2
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://rag:rag@postgres:5432/rag
+      REDIS_URL: redis://redis:6379/0
+      BACKEND1_BASE_URL: http://backend1:8001
+      RETRIEVAL_BACKEND: backend1
+      OPENAI_BASE_URL: http://host.docker.internal:11434/v1
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-no-auth}
+      OPENAI_MODEL: ${OPENAI_MODEL:-qwen2.5:1.5b}
+      EMBEDDING_PROVIDER: ollama
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_EMBEDDING_MODEL: qwen3-embedding:0.6b
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-prod}
+      JWT_ALGORITHM: HS256
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_CHAT_PER_MINUTE: "60"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      backend1:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend1
+      - backend2
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  b1_uploads:
