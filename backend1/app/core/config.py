@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     chunk_overlap: int = 48
     upload_dir: str = "./data/uploads"
 
-    # JWT (shared with 后端2 — see backend2/docs/jwt-handoff.md)
+    # JWT (HS256; share JWT_SECRET with the chat service)
     jwt_secret: str = "change-me-to-a-long-random-string"
     jwt_algorithm: str = "HS256"
 

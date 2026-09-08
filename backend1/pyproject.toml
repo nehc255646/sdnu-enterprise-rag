@@ -1,7 +1,7 @@
 [project]
 name = "rag-backend1"
 version = "0.1.0"
-description = "Enterprise resume RAG — ingest + retrieval (后端1)"
+description = "Document ingest and vector retrieval service"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

@@ -1,6 +1,6 @@
 # backend1 · Docker Compose 接入
 
-## 产物
+## Contents
 
 - `backend1/Dockerfile`
 - 依赖服务：`postgres`、`qdrant`（必选）；`redis`（可选，不可用时内存队列降级）

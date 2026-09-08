@@ -16,7 +16,7 @@ class DocType(str, enum.Enum):
     resume = "resume"
     jd = "jd"
     internship = "internship"
-    kb = "kb"  # general knowledge-base docs (e.g. 了解山东师范大学)
+    kb = "kb"  # knowledge-base documents
     other = "other"
 
 
@@ -72,7 +72,7 @@ class ChunkMeta(Base):
 
 
 class SessionRecord(Base):
-    """Conversation session metadata — owned jointly; 后端2 will extend."""
+    """Conversation session metadata."""
 
     __tablename__ = "sessions"
 

@@ -20,13 +20,7 @@ def require_auth(
     x_tenant_id: Annotated[str, Depends(require_tenant_header)],
     creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> str:
-    """Verify Bearer JWT and align tenant_id with X-Tenant-Id.
-
-    Returns tenant_id. Matches 后端2 handoff:
-    - missing/invalid token → 401
-    - empty tenant header → 400
-    - JWT tenant_id mismatch → 403
-    """
+    """Require Bearer JWT; X-Tenant-Id must match token tenant_id. Returns tenant_id."""
     if creds is None or not creds.credentials:
         raise HTTPException(status_code=401, detail="Authorization Bearer token required")
     try:
@@ -42,5 +36,4 @@ def require_auth(
     return x_tenant_id
 
 
-# backwards-compatible name used by routes
 require_tenant = require_auth

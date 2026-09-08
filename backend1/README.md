@@ -1,84 +1,71 @@
-# RAG Backend1 — Ingest & Retrieval
+# Ingest & Retrieval Service
 
-企业级实习简历知识库 RAG 的 **后端1** 服务：文档入库、向量检索、租户隔离。
+文档入库与向量检索服务：解析 / 切分 / 向量化、租户隔离检索。面向「山东师范大学」等知识库场景。
 
-## 栈
+## Stack
 
-| 组件 | 选型 |
-|------|------|
+| Component | Choice |
+|-----------|--------|
 | API | FastAPI |
-| 编排/切分 | LangChain + RecursiveCharacterTextSplitter |
-| 元数据 | SQLAlchemy → Postgres（本地可 SQLite） |
-| 队列/缓存 | Redis |
-| 向量库 | Qdrant（payload 含 `tenant_id`） |
+| Split / load | LangChain |
+| Metadata | SQLAlchemy → Postgres（本地可用 SQLite） |
+| Queue / cache | Redis（可选） |
+| Vectors | Qdrant（payload 含 `tenant_id`） |
 
-**不在本服务范围**：JWT 鉴权 / LLM 生成链（后端2）、前端页面。
+LLM 对话与签发 JWT 不在本服务范围（见 `backend2/`）。
 
-## 快速启动
+## Quick start
 
 ```bash
 cp .env.example .env
-# 有 Docker 时：
-docker compose up -d
-# 无 Docker 时改 .env：
+# With Docker infra from repo root: docker compose up -d
+# Without Docker, set in .env:
 #   DATABASE_URL=sqlite:///./rag.db
-#   QDRANT_PATH=./data/qdrant
+#   QDRANT_PATH=./data/qdrant-b1
 #   QDRANT_URL=
 
 uv sync
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
-可选独立 worker：
+Optional ingest worker:
 
 ```bash
 uv run python -m app.workers.ingest_worker
 ```
 
-OpenAPI：`http://localhost:8001/docs`
+OpenAPI: `http://localhost:8001/docs`
 
-## 鉴权约定（与后端2 对齐）
+## Auth
 
-受保护接口需同时带：
+Protected routes require:
 
 ```
 Authorization: Bearer <access_token>
 X-Tenant-Id: <tenant>
 ```
 
-JWT：HS256，claims 含 `sub` + `tenant_id`，与后端2 共享 `JWT_SECRET`（见 monorepo `backend2/docs/jwt-handoff.md`）。
-- 缺/无效 token → 401
-- 缺 `X-Tenant-Id` → 400
-- 与 JWT `tenant_id` 不一致 → 403
+JWT is HS256 with claims `sub` and `tenant_id`. Share `JWT_SECRET` with the chat service（详见 `backend2/docs/jwt-handoff.md`）.
 
-`GET /api/v1/health` 公开。
+- missing / invalid token → 401
+- missing `X-Tenant-Id` → 400 / 422
+- header tenant ≠ token `tenant_id` → 403
 
-## 主要 API
+`GET /api/v1/health` is public.
+
+## API
 
 - `GET /api/v1/health`
-- `POST /api/v1/ingest` — multipart：`file`, `doc_type`(`resume|jd|internship|other`), `sync`(bool)
+- `GET /api/v1/documents`
+- `POST /api/v1/ingest` — multipart: `file`, `doc_type` (`kb|resume|jd|internship|other`), `sync`
 - `GET /api/v1/ingest/{document_id}`
-- `POST /api/v1/retrieve` — JSON：`{ "query", "top_k", "doc_type?" }`
+- `POST /api/v1/retrieve` — JSON: `{ "query", "top_k", "doc_type?" }`
 
-## 租户隔离
+## Tenant isolation
 
-Qdrant 检索强制 `tenant_id` payload filter；Postgres 查询按 `tenant_id` 校验。验收：租户 A 入库后，租户 B 同 query 命中为空。
+Qdrant queries always filter on `tenant_id`. Documents are scoped the same way in Postgres.
 
-## 目录
-
-```
-app/
-  api/          # routes + schemas
-  core/         # config, db
-  models/       # SQLAlchemy
-  services/     # ingest, retrieve, qdrant, embeddings, redis
-  workers/      # Redis ingest worker
-docker-compose.yml
-```
-
-## Embedding（Ollama）
-
-默认：
+## Embedding (Ollama)
 
 ```
 EMBEDDING_PROVIDER=ollama
@@ -86,5 +73,4 @@ OLLAMA_BASE_URL=http://127.0.0.1:11434
 OLLAMA_EMBEDDING_MODEL=qwen3-embedding:0.6b
 ```
 
-向量维度 **1024**。换 embedding 模型后会按维度重建 collection，并需重灌语料。后端2 检索必须同模同维。
-
+Vector size is **1024**. After changing the embedding model, recreate the collection and re-ingest. The chat service must use the same model and dimension for query-time embedding if it embeds locally; preferred path is calling this service's `/retrieve`.

@@ -25,11 +25,12 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
-        title="RAG Backend1 — Ingest & Retrieval",
+        title="Ingest & Retrieval API",
         version="0.1.0",
         description=(
-            "Enterprise resume RAG (后端1): LangChain ingest → Qdrant + SQLAlchemy metadata, "
-            "tenant-scoped retrieval. Pass `X-Tenant-Id` on every call (JWT owned by 后端2)."
+            "Document ingest and tenant-scoped vector retrieval "
+            "(LangChain + Qdrant + SQLAlchemy). Protected routes require "
+            "`Authorization: Bearer` and `X-Tenant-Id`."
         ),
         lifespan=lifespan,
     )

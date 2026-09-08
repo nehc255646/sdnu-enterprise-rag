@@ -1,4 +1,4 @@
-"""JWT verify — shared secret with 后端2 (HS256)."""
+"""JWT verification (HS256)."""
 
 from __future__ import annotations
 
