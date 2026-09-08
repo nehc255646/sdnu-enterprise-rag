@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Layout, Menu, Typography, Button, Space, Tag } from 'antd'
 import { FileTextOutlined, MessageOutlined, LogoutOutlined, SettingOutlined } from '@ant-design/icons'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -9,6 +10,7 @@ export default function AppLayout() {
   const loc = useLocation()
   const nav = useNavigate()
   const { auth, logout } = useAuth()
+  const [collapsed, setCollapsed] = useState(false)
   const key = loc.pathname.startsWith('/docs')
     ? 'docs'
     : loc.pathname.startsWith('/settings')
@@ -17,20 +19,40 @@ export default function AppLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#ffffff' }}>
-      <Sider breakpoint="lg" collapsedWidth={72} theme="light" style={{ borderRight: '1px solid #f0f0f0', background: '#ffffff' }}>
-        <div style={{ padding: '16px 12px 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src="/sdnu-emblem-64.png" alt="山东师范大学校徽" width={40} height={40} style={{ flexShrink: 0 }} />
-          <div style={{ minWidth: 0, lineHeight: 1.25 }}>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>山东师范大学</div>
-            <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>知识库问答</div>
-          </div>
-        </div>
-        <Typography.Paragraph
-          type="secondary"
-          style={{ margin: '0 12px 12px', fontSize: 12, lineHeight: 1.4 }}
+      <Sider
+        breakpoint="lg"
+        collapsedWidth={72}
+        collapsible
+        collapsed={collapsed}
+        onCollapse={setCollapsed}
+        theme="light"
+        style={{ borderRight: '1px solid #f0f0f0', background: '#ffffff' }}
+      >
+        <div
+          style={{
+            padding: collapsed ? '16px 0 8px' : '16px 12px 8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            gap: 10,
+          }}
         >
-          弘德明志，博学笃行
-        </Typography.Paragraph>
+          <img src="/sdnu-emblem-64.png" alt="山东师范大学校徽" width={40} height={40} style={{ flexShrink: 0 }} />
+          {!collapsed && (
+            <div style={{ minWidth: 0, lineHeight: 1.25 }}>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>山东师范大学</div>
+              <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>知识库问答</div>
+            </div>
+          )}
+        </div>
+        {!collapsed && (
+          <Typography.Paragraph
+            type="secondary"
+            style={{ margin: '0 12px 12px', fontSize: 12, lineHeight: 1.4 }}
+          >
+            弘德明志，博学笃行
+          </Typography.Paragraph>
+        )}
         <Menu
           mode="inline"
           selectedKeys={[key]}
