@@ -19,11 +19,11 @@ Demo 租户：`sdnu-demo`（登录/注册表单默认填这个）。
 
 | 前缀 | 目标 |
 |------|------|
-| `/ingest-api` | `http://127.0.0.1:8001`（后端1） |
-| `/chat-api` | `http://127.0.0.1:8002`（后端2） |
+| `/ingest-api` | `http://127.0.0.1:8001`（ingest 服务） |
+| `/chat-api` | `http://127.0.0.1:8002`（chat 服务） |
 
 也可在 `.env` 设置 `VITE_INGEST_API` / `VITE_CHAT_API` 直连。
 
-## 安全说明（简历 / Demo）
+## 安全说明
 
-JWT 目前存在浏览器 `localStorage`，XSS 场景可被窃取。Demo / 实习简历演示可接受；生产建议改为 HttpOnly Cookie + CSRF 防护，或短期内存令牌。
+JWT 目前存在浏览器 `localStorage`，XSS 场景可被窃取。当前 Demo 可接受；生产环境建议改为 HttpOnly Cookie + CSRF 防护，或短期内存令牌。

@@ -106,7 +106,7 @@ export default function SettingsPage() {
         extra={<Button icon={<ReloadOutlined />} loading={loading} onClick={() => void refresh()}>刷新</Button>}
       >
         <Typography.Paragraph type="secondary">
-          对齐 Nehchat / Neharness。`api_key` 留空不提交=保持原值；主动清空提交空串=切成 `sk-no-auth`。
+          OpenAI 兼容接口：`base_url` / `api_key` / `model`。`api_key` 留空不提交=保持原值；提交空串=清成 `sk-no-auth`。
         </Typography.Paragraph>
 
         <Descriptions size="small" column={1} bordered style={{ marginBottom: 16 }}>
