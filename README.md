@@ -33,7 +33,11 @@ docker compose up -d --build
 - backend1：http://127.0.0.1:8001/docs
 - backend2：http://127.0.0.1:8002/docs
 
-演示租户 `sdnu-demo`。语料在 `knowledge/sdnu/`；首次可用 demo 账号灌库（或按各服务 README）。Ollama 不进 compose，容器通过 `host.docker.internal:11434` 访问宿主机。
+演示租户：`sdnu-demo`。
+
+首次启动后需要灌库：用 demo 账号登录，带 `X-Tenant-Id: sdnu-demo`，把 `knowledge/sdnu/` 下文档走 ingest 入库（或按各服务 README 的脚本）。未灌库时文档列表为空、问答无命中。
+
+Ollama 不进 compose，容器通过 `host.docker.internal:11434` 访问宿主机。
 
 各服务接入细节见 `backend1/COMPOSE.md`、`backend2/COMPOSE.md`、`frontend/COMPOSE.md`。
 
