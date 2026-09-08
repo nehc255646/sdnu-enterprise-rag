@@ -32,5 +32,7 @@ def get_db() -> Generator[Session, None, None]:
 
 def init_db() -> None:
     from app import models  # noqa: F401
+    from app.core.schema import ensure_shared_schema
 
     Base.metadata.create_all(bind=engine)
+    ensure_shared_schema(engine)

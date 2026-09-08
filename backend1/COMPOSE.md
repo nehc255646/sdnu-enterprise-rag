@@ -35,3 +35,11 @@ depends_on:
 ## 演示语料
 
 仓库根 `knowledge/sdnu/`；首次启动后用 demo JWT + `X-Tenant-Id: sdnu-demo` 调 `POST /api/v1/ingest` 灌入（或挂载后跑脚本）。
+
+## Startup order
+
+1. `postgres` healthy
+2. `backend1` healthy (`/api/v1/health`)
+3. `backend2` starts and runs shared-schema ensure (`users.hashed_password`)
+
+Both services call idempotent schema ensure after `create_all`, so a missing `hashed_password` column is added automatically.

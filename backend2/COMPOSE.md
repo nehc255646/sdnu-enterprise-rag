@@ -47,3 +47,7 @@ depends_on:
 ## 健康检查要点
 
 `GET /api/v1/health` 暴露 `rate_limit` 依赖：`enabled`、`backend=redis|disabled`（见 dependencies detail）。
+
+## Shared database
+
+`users` is shared with the ingest service. On startup this service ensures `users.hashed_password` exists (see `scripts/ensure_users_hashed_password.sql`). Prefer starting after ingest is healthy.

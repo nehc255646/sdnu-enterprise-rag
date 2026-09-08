@@ -33,6 +33,8 @@ class User(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     tenant_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Shared with chat service auth; required on Postgres users table.
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (UniqueConstraint("tenant_id", "email", name="uq_user_tenant_email"),)

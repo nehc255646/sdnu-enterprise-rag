@@ -61,11 +61,12 @@ def get_session_factory():
 
 
 def init_db() -> None:
-    # Import models so metadata is populated
     from app.db import models  # noqa: F401
+    from app.db.schema import ensure_shared_schema
 
     engine = get_engine()
     Base.metadata.create_all(bind=engine)
+    ensure_shared_schema(engine)
 
 
 def get_db() -> Generator[Session, None, None]:

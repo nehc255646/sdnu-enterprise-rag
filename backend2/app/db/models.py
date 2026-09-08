@@ -20,6 +20,7 @@ class DocType(str, enum.Enum):
     resume = "resume"
     jd = "jd"
     internship = "internship"
+    kb = "kb"
     other = "other"
 
 

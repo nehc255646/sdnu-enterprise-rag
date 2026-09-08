@@ -49,6 +49,12 @@ services:
       - ./knowledge/sdnu:/app/knowledge/sdnu:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8001/api/v1/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 18
+      start_period: 15s
     depends_on:
       postgres:
         condition: service_healthy
@@ -80,11 +86,11 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       backend1:
-        condition: service_started
+        condition: service_healthy
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
 
   frontend:
     build: ./frontend
