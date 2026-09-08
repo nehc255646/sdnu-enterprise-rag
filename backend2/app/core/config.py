@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # OpenAI-compatible LLM (ChatOpenAI) — local Ollama /v1 by default
     openai_api_key: str | None = None
     openai_base_url: str = "http://127.0.0.1:11434/v1"
-    openai_model: str = "qwen2.5:3b"
+    openai_model: str = "qwen2.5:1.5b"
 
     # Embeddings (must match 后端1 ingest for direct Qdrant mode)
     embedding_provider: str = "ollama"  # ollama | openai | huggingface | hash
@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 1440
 
     rag_top_k: int = 5
+
+    # Chat rate limit (Redis-backed; degrades to allow when Redis down)
+    rate_limit_enabled: bool = True
+    rate_limit_chat_per_minute: int = 60
 
 
 @lru_cache

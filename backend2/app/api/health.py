@@ -10,6 +10,7 @@ from app.services.llm_runtime import get_llm_config
 from app.db.session import get_engine
 from app.schemas.health import DependencyStatus, HealthResponse
 from app.services.cache import get_redis
+from app.core.rate_limit import rate_limit_status
 
 router = APIRouter(tags=["health"])
 
@@ -57,6 +58,18 @@ def health() -> HealthResponse:
         if use_backend1 and not detail.startswith("optional:"):
             detail = f"optional: {detail}"
         deps.append(DependencyStatus(name="redis", ok=False, detail=detail, optional=use_backend1))
+
+    # Rate limit (Redis-backed; optional — degrades to allow when Redis down)
+    rl = rate_limit_status()
+    deps.append(
+        DependencyStatus(
+            name="rate_limit",
+            ok=bool(rl.get("ok")),
+            detail=f"enabled={rl.get('enabled')} backend={rl.get('backend')}"
+            + (f" | {rl['detail']}" if rl.get("detail") else ""),
+            optional=True,
+        )
+    )
 
     # Qdrant (optional when retrieval_backend=backend1 — retrieval goes via backend1)
     try:

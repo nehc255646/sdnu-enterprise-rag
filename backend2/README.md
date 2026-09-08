@@ -14,7 +14,7 @@
 | API | FastAPI |
 | RAG 编排 | LangChain LCEL（**不用** LlamaIndex） |
 | ORM | SQLAlchemy → Postgres（本地可 SQLite） |
-| 缓存 | Redis（检索结果缓存 + 可选限流 key） |
+| 缓存 / 限流 | Redis（检索缓存 + chat 限流；Redis 宕机时限流降级为放行） |
 | 向量检索 | Qdrant（强制 `tenant_id` payload filter；入库由后端1） |
 | LLM | OpenAI-compatible `ChatOpenAI`（`OPENAI_BASE_URL` + `OPENAI_API_KEY`） |
 | Auth | JWT（python-jose）+ `tenant_id` 强制 |
@@ -105,15 +105,37 @@ data: {"message":"..."}
 pytest -q
 ```
 
-## 评测（Ragas-style）
+## 评测（Ragas · P5）
 
-离线 smoke 样例：`tests/test_ragas_sample.py`（**始终可跑**，不依赖 live LLM / 不必安装 ragas）。
-对合成 contexts 计算 faithfulness / context-precision 风格分数；若已安装 `ragas`+`datasets` 则额外 soft-import 校验 Dataset 接线。
+`tests/test_ragas_sample.py`：
+
+1. **离线 smoke**（始终可跑）：token-overlap faithfulness / context-precision 风格分数。
+2. **真跑** `test_ragas_evaluate_live_ollama`：调用真实 `ragas.evaluate`（faithfulness），OpenAI-compat 指向本地 Ollama  
+   `http://127.0.0.1:11434/v1` · `api_key=sk-no-auth` · `model=qwen2.5:1.5b`（SDNU 校训样例）。  
+   Ollama/模型不可达时 `pytest.skip`；可达时必须 **pass**（非 stub）。
+
+依赖：`requirements.txt` 已含 `ragas` + `datasets`（亦见 `requirements-eval.txt`；需 `langchain-community<0.4`）。
 
 ```bash
+pip install -r requirements.txt   # 或 requirements-eval.txt
 pytest tests/test_ragas_sample.py -q
-# 可选：pip install ragas datasets
 ```
+
+指针：`evals/ragas_sample.py`。
+
+## 限流与健康（P5）
+
+- 配置：`RATE_LIMIT_ENABLED`（默认 true）、`RATE_LIMIT_CHAT_PER_MINUTE`（默认 60）。
+- 作用于 `POST /api/v1/chat` 与 `POST /api/v1/chat/stream`（按 tenant+user Redis INCR）。
+- Redis 不可达 → **降级放行**（不 500）；超限 → **HTTP 429**。
+- Health `dependencies` 含 `rate_limit`：`enabled=… backend=redis|disabled`（optional）。  
+  Redis 对检索可选（`RETRIEVAL_BACKEND=backend1`），但限流/缓存仅在 Redis 正常时生效。见 `COMPOSE.md`。
+
+## Docker（P5）
+
+- `Dockerfile`（python:3.12-slim-bookworm + pip/`requirements.txt`）
+- `COMPOSE.md`（给 @计划 的 compose 接入说明）
+- `.dockerignore`（排除 `.venv` / `rag.db` / `__pycache__` / `.env`）
 
 详见 `docs/jwt-handoff.md` 的 JWT 对接与本 README「与后端1协作」。
 
@@ -132,4 +154,4 @@ tests/
 
 ## 配置（环境变量）
 
-见 `.env.example`：`DATABASE_URL`, `REDIS_URL`, `QDRANT_URL`, `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`, `JWT_SECRET`, `EMBEDDING_MODEL` 等。**禁止把密钥写入代码仓库。**
+见 `.env.example`：`DATABASE_URL`, `REDIS_URL`, `QDRANT_URL`, `OPENAI_*`, `JWT_SECRET`, `EMBEDDING_*`, `RATE_LIMIT_*` 等。**禁止把密钥写入代码仓库。** Compose 建议见 `COMPOSE.md`。

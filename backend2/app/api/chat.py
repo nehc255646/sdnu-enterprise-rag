@@ -10,6 +10,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.deps import CurrentUser, get_current_user
+from app.core.rate_limit import enforce_chat_rate_limit
 from app.db.models import ChatMessage, ChatSession, MessageRole
 from app.db.session import get_db
 from app.schemas.chat import ChatRequest, ChatResponse
@@ -55,6 +56,7 @@ def chat(
     db: Session = Depends(get_db),
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> ChatResponse:
+    enforce_chat_rate_limit(user)
     session = _get_owned_session(db, body.session_id, user)
     authorization = _auth_header(request, creds)
 
@@ -103,6 +105,7 @@ async def chat_stream(
     db: Session = Depends(get_db),
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> StreamingResponse:
+    enforce_chat_rate_limit(user)
     session = _get_owned_session(db, body.session_id, user)
     authorization = _auth_header(request, creds)
 

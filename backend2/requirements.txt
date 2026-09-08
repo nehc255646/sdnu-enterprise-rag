@@ -7,7 +7,7 @@ qdrant-client>=1.12.0
 langchain>=0.3.0
 langchain-core>=0.3.0
 langchain-openai>=0.2.0
-langchain-community>=0.3.0
+langchain-community>=0.3.0,<0.4
 langchain-huggingface>=0.1.0
 pydantic-settings>=2.6.0
 python-jose[cryptography]>=3.3.0
@@ -20,3 +20,6 @@ tenacity>=9.0.0
 pytest>=8.3.0
 pytest-asyncio>=0.24.0
 email-validator>=2.0.0
+# Eval (Ragas live evaluate); keep langchain-community<0.4 for ragas imports
+ragas>=0.2.15,<0.3
+datasets>=2.14.0
