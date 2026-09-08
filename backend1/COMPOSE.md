@@ -1,4 +1,4 @@
-# backend1 · compose 接入说明（给 @计划）
+# backend1 · Docker Compose 接入
 
 ## 产物
 
