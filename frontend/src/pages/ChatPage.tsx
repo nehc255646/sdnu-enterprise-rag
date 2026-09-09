@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, Card, Input, List, Space, Typography, message, Spin, Collapse, Empty, theme } from 'antd'
+import { Button, Card, Input, Space, Typography, message, Spin, Collapse } from 'antd'
 import { PlusOutlined, SendOutlined, DeleteOutlined } from '@ant-design/icons'
 import { createSession, deleteSession, getSession, listSessions, streamChat } from '../api/chat'
 import type { Citation, SessionOut } from '../types'
@@ -10,6 +10,13 @@ type ChatMessage = {
   content: string
   citations?: Citation[]
 }
+
+const SUGGESTIONS = [
+  '山东师范大学的校训是什么？',
+  '学校有哪些校区？',
+  '本科招生如何录取？',
+  '图书馆开放情况怎样？',
+]
 
 function parseCitations(raw?: string | null): Citation[] {
   if (!raw) return []
@@ -22,7 +29,6 @@ function parseCitations(raw?: string | null): Citation[] {
 }
 
 export default function ChatPage() {
-  const { token } = theme.useToken()
   const [sessions, setSessions] = useState<SessionOut[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -124,8 +130,8 @@ export default function ChatPage() {
     }
   }
 
-  async function onSend() {
-    const text = input.trim()
+  async function onSend(preset?: string) {
+    const text = (preset ?? input).trim()
     if (!text || sending) return
     let sid = sessionId
     sendingRef.current = true
@@ -185,88 +191,78 @@ export default function ChatPage() {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 16, minHeight: 'calc(100vh - 120px)' }}>
+    <div className="chat-grid">
       <Card
+        className="surface-card"
         size="small"
         title="会话"
-        extra={<Button size="small" icon={<PlusOutlined />} onClick={() => void onNewSession()}>新建</Button>}
-        styles={{ body: { padding: 0, maxHeight: '70vh', overflow: 'auto' } }}
+        extra={<Button size="small" type="primary" ghost icon={<PlusOutlined />} onClick={() => void onNewSession()}>新建</Button>}
+        styles={{ body: { padding: '8px 0', overflow: 'auto' } }}
       >
         <Spin spinning={loadingSessions}>
           {sessions.length === 0 ? (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无会话" style={{ padding: 24 }} />
+            <Typography.Paragraph type="secondary" style={{ padding: 20, textAlign: 'center' }}>
+              暂无会话，直接提问或点新建。
+            </Typography.Paragraph>
           ) : (
-            <List
-              dataSource={sessions}
-              renderItem={(s) => (
-                <List.Item
-                  style={{
-                    padding: '10px 12px',
-                    cursor: 'pointer',
-                    background: s.id === sessionId ? '#e6f4ff' : undefined,
-                  }}
-                  onClick={() => { if (s.id !== sessionId) setSessionId(s.id) }}
-                  actions={[
-                    <Button
-                      key="del"
-                      type="text"
-                      size="small"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={(e) => { e.stopPropagation(); void onDelete(s.id) }}
-                    />,
-                  ]}
-                >
-                  <Typography.Text ellipsis style={{ maxWidth: 160 }}>{s.title || s.id.slice(0, 8)}</Typography.Text>
-                </List.Item>
-              )}
-            />
+            sessions.map((s) => (
+              <div
+                key={s.id}
+                className={'session-item' + (s.id === sessionId ? ' is-active' : '')}
+                onClick={() => { if (s.id !== sessionId) setSessionId(s.id) }}
+              >
+                <Typography.Text ellipsis style={{ flex: 1 }}>{s.title || s.id.slice(0, 8)}</Typography.Text>
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={(e) => { e.stopPropagation(); void onDelete(s.id) }}
+                />
+              </div>
+            ))
           )}
         </Spin>
       </Card>
 
       <Card
-        title="山东师范大学 · 知识库对话"
-        styles={{ body: { display: 'flex', flexDirection: 'column', height: '70vh' } }}
+        className="surface-card"
+        title="与山师知识库对话"
+        styles={{ body: { display: 'flex', flexDirection: 'column', height: '100%', paddingTop: 12 } }}
       >
-        <div style={{ flex: 1, overflow: 'auto', marginBottom: 12 }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: '4px 4px 12px' }}>
           <Spin spinning={loadingHistory}>
             {messages.length === 0 && !loadingHistory && (
-              <Empty
-              style={{ marginTop: 80 }}
-              description={
-                <span>
-                  问问山东师范大学：校训、宿舍食堂、招生政策、科研平台…
-                  <br />
-                  <Typography.Text type="secondary">弘德明志，博学笃行</Typography.Text>
-                </span>
-              }
-            />
+              <div className="chat-empty">
+                <img src="/sdnu-emblem-64.png" alt="" width={56} height={56} />
+                <h3>了解山东师范大学</h3>
+                <Typography.Text type="secondary">弘德明志，博学笃行 · 从校训、校区到招生就业</Typography.Text>
+                <div className="suggest-row">
+                  {SUGGESTIONS.map((q) => (
+                    <button key={q} type="button" className="suggest-chip" onClick={() => void onSend(q)}>
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
             {messages.map((m) => (
-              <div key={m.id} style={{ marginBottom: 16, display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                <div style={{
-                  maxWidth: '80%',
-                  background: m.role === 'user' ? token.colorPrimary : '#f5f5f5',
-                  color: m.role === 'user' ? '#fff' : 'inherit',
-                  padding: '10px 14px',
-                  borderRadius: 12,
-                  whiteSpace: 'pre-wrap',
-                }}>
-                  {m.content || (sending && m.role === 'assistant' ? '…' : '')}
+              <div key={m.id} className={'bubble-row ' + m.role}>
+                <div className={'bubble ' + m.role}>
+                  {m.content || (sending && m.role === 'assistant' ? '正在检索…' : '')}
                   {!!m.citations?.length && (
                     <Collapse
                       size="small"
                       style={{ marginTop: 8, background: '#fff', color: '#000' }}
                       items={[{
                         key: 'c',
-                        label: '引用 (' + m.citations.length + ')',
+                        label: '引用 · ' + m.citations.length + ' 条',
                         children: (
                           <Space direction="vertical" style={{ width: '100%' }}>
                             {m.citations.map((c, i) => (
                               <Typography.Paragraph key={i} style={{ marginBottom: 0 }}>
                                 <Typography.Text strong>{c.filename || c.document_id || 'doc'}</Typography.Text>
-                                {c.score != null && <Typography.Text type="secondary"> · score {c.score.toFixed(3)}</Typography.Text>}
+                                {c.score != null && <Typography.Text type="secondary"> · {c.score.toFixed(3)}</Typography.Text>}
                                 <br />
                                 <Typography.Text type="secondary">{c.text}</Typography.Text>
                               </Typography.Paragraph>
@@ -282,12 +278,13 @@ export default function ChatPage() {
             <div ref={bottomRef} />
           </Spin>
         </div>
-        <Space.Compact style={{ width: '100%' }}>
+        <div className="composer">
           <Input.TextArea
             value={input}
+            variant="borderless"
             onChange={(e) => setInput(e.target.value)}
             autoSize={{ minRows: 1, maxRows: 4 }}
-            placeholder="输入问题，Enter 发送"
+            placeholder="输入问题，Enter 发送 · Shift+Enter 换行"
             onPressEnter={(e) => {
               if (!e.shiftKey) {
                 e.preventDefault()
@@ -296,10 +293,10 @@ export default function ChatPage() {
             }}
             disabled={sending}
           />
-          <Button type="primary" icon={<SendOutlined />} loading={sending} onClick={() => void onSend()}>
+          <Button type="primary" shape="round" icon={<SendOutlined />} loading={sending} onClick={() => void onSend()}>
             发送
           </Button>
-        </Space.Compact>
+        </div>
       </Card>
     </div>
   )

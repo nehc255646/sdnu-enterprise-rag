@@ -1,7 +1,502 @@
-html, body, #root {
+:root {
+  --ink: #1c1917;
+  --muted: #6f6a64;
+  --paper: #f3efe8;
+  --surface: #fffcf8;
+  --line: rgba(28, 25, 23, 0.08);
+  --navy: #1b4f8a;
+  --gold: #b0894a;
+  --accent: #e60012;
+  --shadow: 0 1px 2px rgba(28, 25, 23, 0.04), 0 10px 28px rgba(28, 25, 23, 0.06);
+  --font-sans: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-serif: 'Noto Serif SC', 'Songti SC', 'STSong', serif;
+}
+
+html,
+body,
+#root {
   margin: 0;
   min-height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  background: #ffffff;
-  color: rgba(0, 0, 0, 0.88);
+  font-family: var(--font-sans);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  background-image:
+    radial-gradient(1200px 500px at 0% -10%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%),
+    radial-gradient(900px 420px at 100% 0%, color-mix(in srgb, var(--navy) 10%, transparent), transparent 55%);
+}
+
+#root {
+  isolation: isolate;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background: transparent;
+}
+
+.app-shell .ant-layout {
+  background: transparent;
+}
+
+.app-sider.ant-layout-sider {
+  background: color-mix(in srgb, var(--surface) 88%, #fff) !important;
+  border-right: 1px solid var(--line);
+  box-shadow: 8px 0 24px rgba(28, 25, 23, 0.03);
+}
+
+.app-sider .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px 12px;
+}
+
+.brand-lockup.is-collapsed {
+  justify-content: center;
+  padding: 20px 8px 12px;
+}
+
+.brand-lockup img {
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 6px rgba(27, 79, 138, 0.18));
+}
+
+.brand-name {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.brand-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.brand-motto {
+  margin: 0 16px 16px;
+  padding: 10px 12px;
+  font-family: var(--font-serif);
+  font-size: 13px;
+  color: var(--navy);
+  background: color-mix(in srgb, var(--navy) 6%, #fff);
+  border: 1px solid color-mix(in srgb, var(--navy) 12%, transparent);
+  border-radius: 10px;
+  text-align: center;
+  letter-spacing: 0.12em;
+}
+
+.app-menu.ant-menu {
+  background: transparent !important;
+  border-inline-end: none !important;
+  padding: 0 8px;
+  flex: 1;
+}
+
+.app-menu .ant-menu-item {
+  height: 44px;
+  line-height: 44px;
+  margin-inline: 0;
+  border-radius: 10px;
+  width: 100%;
+}
+
+.app-header.ant-layout-header {
+  height: 72px;
+  line-height: normal;
+  padding-inline: 28px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent) !important;
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header-kicker {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+
+.header-title {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.header-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px 4px 4px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  line-height: 1.2;
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--navy);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.app-content.ant-layout-content {
+  padding: 24px 28px 32px;
+  background: transparent;
+}
+
+.surface-card.ant-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.surface-card .ant-card-head {
+  border-bottom-color: var(--line);
+  min-height: 56px;
+}
+
+.surface-card .ant-card-head-title {
+  font-family: var(--font-serif);
+  font-weight: 700;
+}
+
+.chat-grid {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+  height: calc(100vh - 128px);
+  min-height: 520px;
+}
+
+.chat-grid > .ant-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-grid > .ant-card .ant-card-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.session-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 4px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.session-item:hover {
+  background: color-mix(in srgb, var(--accent) 6%, #fff);
+}
+
+.session-item.is-active {
+  background: color-mix(in srgb, var(--accent) 12%, #fff);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.bubble-row {
+  display: flex;
+  margin-bottom: 14px;
+}
+
+.bubble-row.user {
+  justify-content: flex-end;
+}
+
+.bubble-row.assistant {
+  justify-content: flex-start;
+}
+
+.bubble {
+  max-width: min(72%, 640px);
+  padding: 12px 16px;
+  border-radius: 16px;
+  white-space: pre-wrap;
+  line-height: 1.65;
+  font-size: 14.5px;
+}
+
+.bubble.user {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 6px;
+}
+
+.bubble.assistant {
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-bottom-left-radius: 6px;
+}
+
+.chat-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+}
+
+.chat-empty h3 {
+  font-family: var(--font-serif);
+  margin: 8px 0 0;
+  font-size: clamp(18px, 2.2vw, 22px);
+}
+
+.suggest-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  max-width: 560px;
+}
+
+.suggest-chip {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.suggest-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 8px 20px rgba(28, 25, 23, 0.04);
+}
+
+.composer .ant-input {
+  box-shadow: none !important;
+}
+
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(320px, 1.05fr) minmax(380px, 0.95fr);
+}
+
+.login-brand {
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+  min-height: 100vh;
+}
+
+.login-brand-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.04);
+}
+
+.login-brand-scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(15, 32, 64, 0.22) 0%, rgba(15, 32, 64, 0.58) 42%, rgba(12, 22, 42, 0.94) 100%),
+    linear-gradient(90deg, rgba(230, 0, 18, 0.16), transparent 48%);
+}
+
+.login-brand-inner {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 40px 44px 36px;
+}
+
+.login-brand-inner h1 {
+  font-family: var(--font-serif);
+  font-size: 36px;
+  margin: 16px 0 8px;
+  letter-spacing: 0.04em;
+}
+
+.login-motto {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  letter-spacing: 0.28em;
+  color: #f3d9a4;
+  margin: 0 0 8px;
+}
+
+.login-en {
+  opacity: 0.78;
+  letter-spacing: 0.16em;
+  font-size: 12px;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.login-points {
+  list-style: none;
+  margin: 0;
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+  max-width: 380px;
+  background: rgba(8, 16, 32, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  backdrop-filter: blur(8px);
+}
+
+.login-points li {
+  font-size: 14px;
+  padding-left: 14px;
+  position: relative;
+  color: #fff;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+}
+
+.login-points li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f3d9a4;
+}
+
+.login-panel {
+  display: grid;
+  place-items: center;
+  padding: 40px 32px;
+}
+
+.login-card {
+  width: min(420px, 100%);
+  background: var(--surface) !important;
+  border-radius: 20px !important;
+  box-shadow: var(--shadow) !important;
+  border: 1px solid var(--line) !important;
+}
+
+.login-card-head {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.login-card-head h2 {
+  font-family: var(--font-serif);
+  margin: 12px 0 4px;
+  font-size: 22px;
+}
+
+.filename-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.filename-cell .id {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (max-width: 960px) {
+  .login-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .login-brand {
+    min-height: 240px;
+  }
+
+  .login-brand-inner {
+    padding: 28px 24px;
+  }
+
+  .login-brand-inner h1 {
+    font-size: 26px;
+  }
+
+  .login-points {
+    display: none;
+  }
+
+  .chat-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .app-content.ant-layout-content {
+    padding: 16px;
+  }
+
+  .header-kicker,
+  .user-email,
+  .logout-label {
+    display: none;
+  }
+
+  .app-header.ant-layout-header {
+    padding-inline: 12px;
+    height: 60px;
+  }
+
+  .header-title {
+    font-size: 16px;
+  }
 }

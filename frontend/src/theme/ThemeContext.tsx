@@ -8,7 +8,7 @@ export const DEFAULT_ACCENT = '#E60012'
 
 export const ACCENT_PRESETS = [
   { label: '校红', value: '#E60012' },
-  { label: '校蓝', value: '#004B87' },
+  { label: '校蓝', value: '#1B4F8A' },
   { label: '默认蓝', value: '#1677ff' },
   { label: '青绿', value: '#13c2c2' },
   { label: '极光绿', value: '#52c41a' },
@@ -29,6 +29,8 @@ function loadAccent(): string {
   } catch { /* ignore */ }
   return DEFAULT_ACCENT
 }
+
+const FONT = `'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif`
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [accent, setAccentState] = useState(loadAccent)
@@ -54,9 +56,32 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             colorPrimary: accent,
             colorLink: accent,
             colorInfo: accent,
-            borderRadius: 8,
-            colorBgBase: '#ffffff',
-            colorTextBase: 'rgba(0,0,0,0.88)',
+            borderRadius: 12,
+            colorBgBase: '#fffdf9',
+            colorBgLayout: '#f3efe8',
+            colorTextBase: '#1c1917',
+            colorBorder: 'rgba(28,25,23,0.10)',
+            colorBorderSecondary: 'rgba(28,25,23,0.06)',
+            fontFamily: FONT,
+            fontSize: 14,
+            controlHeight: 36,
+          },
+          components: {
+            Layout: {
+              headerBg: 'transparent',
+              bodyBg: 'transparent',
+              siderBg: 'transparent',
+            },
+            Card: {
+              headerFontSize: 16,
+            },
+            Menu: {
+              itemBorderRadius: 10,
+              itemMarginInline: 0,
+            },
+            Button: {
+              fontWeight: 560,
+            },
           },
         }}
       >

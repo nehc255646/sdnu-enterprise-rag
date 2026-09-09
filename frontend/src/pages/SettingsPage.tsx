@@ -66,9 +66,9 @@ export default function SettingsPage() {
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <Card title="外观设置">
+      <Card className="surface-card" title="外观设置">
         <Typography.Paragraph type="secondary">
-          默认白底。强调色只作用于按钮、链接、菜单选中态等交互元素，不会改正文或页面背景。
+          暖色纸感底。强调色作用于按钮、链接、菜单选中态与对话气泡，不改正文纸色。
         </Typography.Paragraph>
         <Typography.Text strong style={{ display: 'block', marginBottom: 12 }}>强调色</Typography.Text>
         <Space wrap size={12}>
@@ -102,6 +102,7 @@ export default function SettingsPage() {
       </Card>
 
       <Card
+        className="surface-card"
         title="主模型（OpenAI 兼容）"
         extra={<Button icon={<ReloadOutlined />} loading={loading} onClick={() => void refresh()}>刷新</Button>}
       >

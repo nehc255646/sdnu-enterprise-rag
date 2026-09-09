@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Card, Form, Input, Tabs, Typography, message, Space } from 'antd'
+import { Button, Card, Form, Input, Tabs, Typography, message } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { login, register } from '../api/auth'
 import { useAuth } from '../auth/AuthContext'
@@ -40,61 +40,72 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#ffffff' }}>
-      <Card style={{ width: 440 }}>
-        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+    <div className="login-shell">
+      <aside className="login-brand">
+        <img className="login-brand-art" src="/login-art.jpg" alt="" />
+        <div className="login-brand-scrim" />
+        <div className="login-brand-inner">
           <img src="/sdnu-emblem-128.png" alt="山东师范大学校徽" width={72} height={72} />
-          <Typography.Title level={4} style={{ margin: '12px 0 4px' }}>
-            山东师范大学知识库
-          </Typography.Title>
-          <Typography.Text type="secondary">弘德明志，博学笃行</Typography.Text>
+          <h1>山东师范大学</h1>
+          <p className="login-motto">弘德明志 · 博学笃行</p>
+          <p className="login-en">Shandong Normal University · Knowledge Base</p>
+          <ul className="login-points">
+            <li>多租户知识库检索与引用溯源</li>
+            <li>流式对话，校史校情即问即答</li>
+            <li>文档入库、会话与模型热切换</li>
+          </ul>
         </div>
-        <Typography.Paragraph type="secondary" style={{ textAlign: 'center' }}>
-          Demo 租户建议使用 <Typography.Text code>{defaultTenant}</Typography.Text>
-        </Typography.Paragraph>
-        <Tabs
-          items={[
-            {
-              key: 'login',
-              label: '登录',
-              children: (
-                <Form layout="vertical" onFinish={onLogin} initialValues={{ tenant_id: defaultTenant }}>
-                  <Form.Item name="email" label="邮箱" rules={[{ required: true, type: 'email' }]}>
-                    <Input placeholder="you@example.com" />
-                  </Form.Item>
-                  <Form.Item name="password" label="密码" rules={[{ required: true, min: 6 }]}>
-                    <Input.Password />
-                  </Form.Item>
-                  <Form.Item name="tenant_id" label="租户 ID" rules={[{ required: true }]}>
-                    <Input />
-                  </Form.Item>
-                  <Button type="primary" htmlType="submit" block loading={loading}>登录</Button>
-                </Form>
-              ),
-            },
-            {
-              key: 'register',
-              label: '注册',
-              children: (
-                <Form layout="vertical" onFinish={onRegister} initialValues={{ tenant_id: defaultTenant }}>
-                  <Form.Item name="email" label="邮箱" rules={[{ required: true, type: 'email' }]}>
-                    <Input />
-                  </Form.Item>
-                  <Form.Item name="password" label="密码" rules={[{ required: true, min: 6 }]}>
-                    <Input.Password />
-                  </Form.Item>
-                  <Form.Item name="tenant_id" label="租户 ID">
-                    <Input placeholder={defaultTenant} />
-                  </Form.Item>
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <Button type="primary" htmlType="submit" block loading={loading}>注册并进入</Button>
-                  </Space>
-                </Form>
-              ),
-            },
-          ]}
-        />
-      </Card>
+      </aside>
+      <main className="login-panel">
+        <Card className="login-card" variant="borderless">
+          <div className="login-card-head">
+            <Typography.Title level={3} style={{ margin: 0 }}>欢迎回来</Typography.Title>
+            <Typography.Paragraph type="secondary" style={{ margin: '8px 0 0' }}>
+              Demo 租户建议使用 <Typography.Text code>{defaultTenant}</Typography.Text>
+            </Typography.Paragraph>
+          </div>
+          <Tabs
+            items={[
+              {
+                key: 'login',
+                label: '登录',
+                children: (
+                  <Form layout="vertical" onFinish={onLogin} initialValues={{ tenant_id: defaultTenant }}>
+                    <Form.Item name="email" label="邮箱" rules={[{ required: true, type: 'email' }]}>
+                      <Input size="large" placeholder="you@example.com" />
+                    </Form.Item>
+                    <Form.Item name="password" label="密码" rules={[{ required: true, min: 6 }]}>
+                      <Input.Password size="large" />
+                    </Form.Item>
+                    <Form.Item name="tenant_id" label="租户 ID" rules={[{ required: true }]}>
+                      <Input size="large" />
+                    </Form.Item>
+                    <Button type="primary" htmlType="submit" block size="large" loading={loading}>登录</Button>
+                  </Form>
+                ),
+              },
+              {
+                key: 'register',
+                label: '注册',
+                children: (
+                  <Form layout="vertical" onFinish={onRegister} initialValues={{ tenant_id: defaultTenant }}>
+                    <Form.Item name="email" label="邮箱" rules={[{ required: true, type: 'email' }]}>
+                      <Input size="large" />
+                    </Form.Item>
+                    <Form.Item name="password" label="密码" rules={[{ required: true, min: 6 }]}>
+                      <Input.Password size="large" />
+                    </Form.Item>
+                    <Form.Item name="tenant_id" label="租户 ID">
+                      <Input size="large" placeholder={defaultTenant} />
+                    </Form.Item>
+                    <Button type="primary" htmlType="submit" block size="large" loading={loading}>注册并进入</Button>
+                  </Form>
+                ),
+              },
+            ]}
+          />
+        </Card>
+      </main>
     </div>
   )
 }
