@@ -70,7 +70,7 @@ docker compose up -d --build
 **方式 B — 本机 `start.sh`**
 
 ```bash
-./start.sh          # Postgres + Qdrant（Docker）+ 本机 Redis / Ollama + 双后端 + 前端
+./start.sh          # Postgres + Qdrant（Docker）+ 本机 Redis / Ollama + 双后端 + 前端；缺语料时灌入 knowledge/sdnu
 ./start.sh stop
 ```
 
@@ -80,7 +80,7 @@ docker compose up -d --build
 | backend1 OpenAPI | http://127.0.0.1:8001/docs |
 | backend2 OpenAPI | http://127.0.0.1:8002/docs |
 
-**首次灌库**：Compose / `start.sh` **不会**自动入库。用租户 `sdnu-demo` 注册登录后，在文档页上传 `knowledge/sdnu/`（小 txt 建议 `sync=true`），或对 `:8001` 调 `POST /api/v1/ingest`（`Authorization` + `X-Tenant-Id: sdnu-demo`）。
+**首次灌库**：`./start.sh` 会按文件名补齐 `knowledge/sdnu/` 到租户 `sdnu-demo`。Compose **不会**自动入库；用 `sdnu-demo` 注册登录后在文档页上传（小 txt 建议 `sync=true`），或对 `:8001` 调 `POST /api/v1/ingest`（`Authorization` + `X-Tenant-Id: sdnu-demo`）。
 
 ## 端口与关键 API
 

@@ -135,6 +135,8 @@ cmd_start() {
   wait_http "http://127.0.0.1:8001/api/v1/health" "backend1" 50
   wait_http "http://127.0.0.1:8002/api/v1/health" "backend2" 50
   wait_http "http://127.0.0.1:5173/" "frontend" 50
+  log "seeding knowledge/sdnu..."
+  (cd "${ROOT}/backend1" && uv run python "${ROOT}/scripts/seed_sdnu_kb.py")
   log ""
   log "ready"
   log "  frontend   http://127.0.0.1:5173"
