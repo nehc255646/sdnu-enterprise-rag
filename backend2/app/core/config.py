@@ -48,7 +48,6 @@ class Settings(BaseSettings):
     rate_limit_chat_per_minute: int = 60
     rate_limit_auth_per_minute: int = 20
     cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
-    llm_base_url_allowlist: str = ""
 
 
 @lru_cache

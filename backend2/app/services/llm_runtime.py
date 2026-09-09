@@ -29,26 +29,10 @@ def _env_config() -> LLMRuntimeConfig:
     )
 
 
-def allowed_llm_hosts() -> set[str]:
-    settings = get_settings()
-    hosts = {"127.0.0.1", "localhost", "host.docker.internal", "::1"}
-    env_host = urlparse(settings.openai_base_url).hostname
-    if env_host:
-        hosts.add(env_host.lower())
-    for item in settings.llm_base_url_allowlist.split(","):
-        h = item.strip().lower()
-        if h:
-            hosts.add(h)
-    return hosts
-
-
 def validate_llm_base_url(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("base_url must be http(s) with a host")
-    host = (parsed.hostname or "").lower()
-    if host not in allowed_llm_hosts():
-        raise ValueError(f"base_url host not allowed: {host}")
     return url.rstrip("/")
 
 
