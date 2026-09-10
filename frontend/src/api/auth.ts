@@ -1,8 +1,8 @@
-import { chatFetch, saveAuth, type StoredAuth } from './client'
+import { apiFetch, saveAuth, type StoredAuth } from './client'
 import type { TokenResponse } from '../types'
 
 export async function login(email: string, password: string, tenant_id: string) {
-  const data = (await chatFetch('/api/v1/auth/login', {
+  const data = (await apiFetch('/api/v1/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password, tenant_id }),
   })) as TokenResponse
@@ -17,7 +17,7 @@ export async function login(email: string, password: string, tenant_id: string) 
 }
 
 export async function register(email: string, password: string, tenant_id?: string) {
-  const data = (await chatFetch('/api/v1/auth/register', {
+  const data = (await apiFetch('/api/v1/auth/register', {
     method: 'POST',
     body: JSON.stringify({ email, password, tenant_id: tenant_id || undefined }),
   })) as TokenResponse

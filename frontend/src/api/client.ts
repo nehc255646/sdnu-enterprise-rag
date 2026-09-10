@@ -1,5 +1,4 @@
-const INGEST_BASE = (import.meta.env.VITE_INGEST_API as string) || '/ingest-api'
-const CHAT_BASE = (import.meta.env.VITE_CHAT_API as string) || '/chat-api'
+const API_BASE = (import.meta.env.VITE_API as string) || ''
 
 const AUTH_KEY = 'sdnu_rag_auth'
 
@@ -37,7 +36,7 @@ export function handleUnauthorized(status: number) {
   if (status === 401) redirectToLogin()
 }
 
-function authHeaders(extra?: HeadersInit): Headers {
+export function authHeaders(extra?: HeadersInit): Headers {
   const h = new Headers(extra)
   const auth = loadAuth()
   if (auth?.access_token) h.set('Authorization', `Bearer ${auth.access_token}`)
@@ -59,12 +58,16 @@ function isPublicAuthPath(path: string) {
   return path.includes('/auth/login') || path.includes('/auth/register')
 }
 
-export async function chatFetch(path: string, init: RequestInit = {}) {
+export function apiUrl(path: string) {
+  return `${API_BASE}${path}`
+}
+
+export async function apiFetch(path: string, init: RequestInit = {}) {
   const headers = authHeaders(init.headers)
   if (init.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
-  const res = await fetch(`${CHAT_BASE}${path}`, { ...init, headers })
+  const res = await fetch(apiUrl(path), { ...init, headers })
   if (res.status === 401) {
     if (!isPublicAuthPath(path)) handleUnauthorized(401)
     throw new Error(isPublicAuthPath(path) ? await parseError(res) : '未登录或登录已过期')
@@ -76,15 +79,4 @@ export async function chatFetch(path: string, init: RequestInit = {}) {
   return res
 }
 
-export async function ingestFetch(path: string, init: RequestInit = {}) {
-  const headers = authHeaders(init.headers)
-  const res = await fetch(`${INGEST_BASE}${path}`, { ...init, headers })
-  if (res.status === 401) {
-    handleUnauthorized(401)
-    throw new Error('未登录或登录已过期')
-  }
-  if (!res.ok) throw new Error(await parseError(res))
-  return res.json()
-}
-
-export { INGEST_BASE, CHAT_BASE, authHeaders }
+export { API_BASE }

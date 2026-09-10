@@ -1,0 +1,12 @@
+.venv
+__pycache__
+.pytest_cache
+data
+*.db
+.env
+.git
+tests
+evals
+*.egg-info
+openapi.json
+openapi.yaml

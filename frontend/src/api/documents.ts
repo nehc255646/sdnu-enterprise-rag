@@ -1,4 +1,4 @@
-import { ingestFetch, authHeaders, INGEST_BASE, handleUnauthorized } from './client'
+import { apiFetch, apiUrl, authHeaders, handleUnauthorized } from './client'
 import type { DocumentListResponse } from '../types'
 
 export const ALLOWED_UPLOAD_EXT = ['.txt', '.md', '.markdown', '.pdf', '.docx']
@@ -29,7 +29,7 @@ export async function listDocuments(params?: {
   if (params?.limit != null) q.set('limit', String(params.limit))
   const qs = q.toString()
   const path = '/api/v1/documents' + (qs ? '?' + qs : '')
-  return (await ingestFetch(path)) as DocumentListResponse
+  return (await apiFetch(path)) as DocumentListResponse
 }
 
 export async function uploadDocument(file: File, doc_type = 'kb', sync?: boolean) {
@@ -40,7 +40,7 @@ export async function uploadDocument(file: File, doc_type = 'kb', sync?: boolean
   form.append('file', file)
   form.append('doc_type', doc_type)
   form.append('sync', String(useSync))
-  const res = await fetch(INGEST_BASE + '/api/v1/ingest', {
+  const res = await fetch(apiUrl('/api/v1/ingest'), {
     method: 'POST',
     headers: authHeaders(),
     body: form,

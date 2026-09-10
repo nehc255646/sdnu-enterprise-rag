@@ -3,9 +3,7 @@
 ## 产物
 
 - `frontend/Dockerfile`（多阶段：Node 构建 → nginx:alpine）
-- `frontend/nginx.conf`：静态资源 + 反代
-  - `/ingest-api/` → `http://backend1:8001/`
-  - `/chat-api/` → `http://backend2:8002/`（SSE：`proxy_buffering off`）
+- `frontend/nginx.conf`：静态资源 + 反代 `/api/` → `http://backend:8000/api/`（SSE：`proxy_buffering off`；上传：`client_max_body_size 20m`）
 
 ## 建议服务片段
 
@@ -15,10 +13,9 @@ frontend:
   ports:
     - "5173:80"   # 或 "80:80"
   depends_on:
-    - backend1
-    - backend2
+    - backend
 ```
 
-浏览器只访问前端端口；构建期用相对路径 `/ingest-api`、`/chat-api`，勿把 `VITE_*` 写成容器内 hostname。
+浏览器只访问前端端口；构建期用相对路径 `/api`，勿把 `VITE_API` 写成容器内 hostname。
 
 Demo 租户默认 `sdnu-demo`。

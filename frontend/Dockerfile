@@ -1,4 +1,4 @@
-# frontend — Vite build + nginx (proxies /ingest-api → backend1, /chat-api → backend2)
+# frontend — Vite build + nginx (proxies /api → backend :8000)
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 
@@ -9,9 +9,8 @@ COPY index.html vite.config.ts tsconfig*.json ./
 COPY public ./public
 COPY src ./src
 
-# Relative /ingest-api and /chat-api — nginx rewrites in runtime image
-ENV VITE_INGEST_API= \
-    VITE_CHAT_API= \
+# Relative /api — nginx proxies in runtime image
+ENV VITE_API= \
     VITE_DEFAULT_TENANT=sdnu-demo
 
 RUN npm run build

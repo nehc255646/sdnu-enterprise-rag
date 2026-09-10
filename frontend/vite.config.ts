@@ -6,15 +6,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/ingest-api': {
-        target: 'http://127.0.0.1:8001',
+      '/api': {
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/ingest-api/, ''),
-      },
-      '/chat-api': {
-        target: 'http://127.0.0.1:8002',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/chat-api/, ''),
       },
     },
   },

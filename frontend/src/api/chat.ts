@@ -1,23 +1,23 @@
-import { chatFetch, authHeaders, CHAT_BASE, handleUnauthorized } from './client'
+import { apiFetch, apiUrl, authHeaders, handleUnauthorized } from './client'
 import type { Citation, SessionOut, SessionWithMessages } from '../types'
 
 export async function listSessions() {
-  return (await chatFetch('/api/v1/sessions')) as SessionOut[]
+  return (await apiFetch('/api/v1/sessions')) as SessionOut[]
 }
 
 export async function createSession(title?: string) {
-  return (await chatFetch('/api/v1/sessions', {
+  return (await apiFetch('/api/v1/sessions', {
     method: 'POST',
     body: JSON.stringify({ title: title || undefined }),
   })) as SessionOut
 }
 
 export async function getSession(id: string) {
-  return (await chatFetch('/api/v1/sessions/' + id)) as SessionWithMessages
+  return (await apiFetch('/api/v1/sessions/' + id)) as SessionWithMessages
 }
 
 export async function deleteSession(id: string) {
-  await chatFetch('/api/v1/sessions/' + id, { method: 'DELETE' })
+  await apiFetch('/api/v1/sessions/' + id, { method: 'DELETE' })
 }
 
 export type StreamHandlers = {
@@ -33,7 +33,7 @@ export async function streamChat(
   handlers: StreamHandlers,
   signal?: AbortSignal,
 ) {
-  const res = await fetch(CHAT_BASE + '/api/v1/chat/stream', {
+  const res = await fetch(apiUrl('/api/v1/chat/stream'), {
     method: 'POST',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ session_id: sessionId, message }),

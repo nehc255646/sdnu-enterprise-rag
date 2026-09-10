@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 本机开发一键启动 / 停止：Postgres+Qdrant（Docker）、本机 Redis、Ollama、两个后端、前端。
+# 本机开发一键启动 / 停止：Postgres+Qdrant（Docker）、本机 Redis、Ollama、后端、前端。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,24 +37,39 @@ ensure_env() {
   if [[ ! -f "${ROOT}/.env" ]]; then
     cp "${ROOT}/.env.example" "${ROOT}/.env"
   fi
-  if [[ ! -f "${ROOT}/backend1/.env" ]]; then
-    cp "${ROOT}/backend1/.env.example" "${ROOT}/backend1/.env"
-  fi
-  if [[ ! -f "${ROOT}/backend2/.env" ]]; then
-    cp "${ROOT}/backend2/.env.example" "${ROOT}/backend2/.env"
+  if [[ ! -f "${ROOT}/backend/.env" ]]; then
+    cp "${ROOT}/backend/.env.example" "${ROOT}/backend/.env"
   fi
   if [[ ! -f "${ROOT}/frontend/.env" && -f "${ROOT}/frontend/.env.example" ]]; then
     cp "${ROOT}/frontend/.env.example" "${ROOT}/frontend/.env"
   fi
 }
 
+export_jwt_from_backend_env() {
+  if [[ -n "${JWT_SECRET:-}" ]]; then
+    export JWT_SECRET
+    return 0
+  fi
+  local envf="${ROOT}/backend/.env"
+  [[ -f "${envf}" ]] || return 0
+  local line
+  line="$(grep -E '^[[:space:]]*JWT_SECRET=' "${envf}" | tail -n 1 || true)"
+  [[ -n "${line}" ]] || return 0
+  JWT_SECRET="${line#*=}"
+  JWT_SECRET="${JWT_SECRET%\"}"
+  JWT_SECRET="${JWT_SECRET#\"}"
+  JWT_SECRET="${JWT_SECRET%\'}"
+  JWT_SECRET="${JWT_SECRET#\'}"
+  export JWT_SECRET
+}
+
 start_infra() {
   command -v docker >/dev/null 2>&1 || die "docker not found"
-  docker compose -f "${ROOT}/backend1/docker-compose.yml" up -d postgres qdrant
+  docker compose -f "${ROOT}/docker-compose.yml" up -d postgres qdrant
   if command -v redis-cli >/dev/null 2>&1 && redis-cli ping >/dev/null 2>&1; then
     log "  redis: host service on :6379"
   else
-    docker compose -f "${ROOT}/backend1/docker-compose.yml" up -d redis
+    docker compose -f "${ROOT}/docker-compose.yml" up -d redis
     log "  redis: docker :6379"
   fi
   command -v ollama >/dev/null 2>&1 || die "ollama not found; install from https://ollama.com"
@@ -65,30 +80,17 @@ start_infra() {
   ollama list | grep -q 'qwen2.5:1.5b' || ollama pull qwen2.5:1.5b
 }
 
-start_backend1() {
-  if port_in_use 8001; then
-    log "  backend1 already on :8001"
+start_backend() {
+  if port_in_use 8000; then
+    log "  backend already on :8000"
     return 0
   fi
-  if [[ ! -d "${ROOT}/backend1/.venv" ]]; then
-    (cd "${ROOT}/backend1" && uv sync --python 3.12 --extra dev)
+  if [[ ! -d "${ROOT}/backend/.venv" ]]; then
+    (cd "${ROOT}/backend" && uv sync --python 3.12 --extra dev)
   fi
-  nohup bash -lc "cd '${ROOT}/backend1' && uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload" \
-    >"${RUN_DIR}/backend1.log" 2>&1 &
-  echo $! >"${RUN_DIR}/backend1.pid"
-}
-
-start_backend2() {
-  if port_in_use 8002; then
-    log "  backend2 already on :8002"
-    return 0
-  fi
-  if [[ ! -d "${ROOT}/backend2/.venv" ]]; then
-    (cd "${ROOT}/backend2" && uv venv --python 3.12 .venv && uv pip install --python .venv -r requirements.txt)
-  fi
-  nohup bash -lc "cd '${ROOT}/backend2' && .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8002 --reload" \
-    >"${RUN_DIR}/backend2.log" 2>&1 &
-  echo $! >"${RUN_DIR}/backend2.pid"
+  nohup bash -lc "cd '${ROOT}/backend' && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload" \
+    >"${RUN_DIR}/backend.log" 2>&1 &
+  echo $! >"${RUN_DIR}/backend.pid"
 }
 
 start_frontend() {
@@ -119,6 +121,7 @@ stop_pidfile() {
 
 cmd_stop() {
   stop_pidfile "${RUN_DIR}/frontend.pid"
+  stop_pidfile "${RUN_DIR}/backend.pid"
   stop_pidfile "${RUN_DIR}/backend2.pid"
   stop_pidfile "${RUN_DIR}/backend1.pid"
   log "stopped app processes (Postgres/Qdrant/Redis/Ollama left running)"
@@ -129,23 +132,21 @@ cmd_start() {
   log "starting infra..."
   start_infra
   log "starting apps..."
-  start_backend1
-  start_backend2
+  start_backend
   start_frontend
-  wait_http "http://127.0.0.1:8001/api/v1/health" "backend1" 50
-  wait_http "http://127.0.0.1:8002/api/v1/health" "backend2" 50
+  wait_http "http://127.0.0.1:8000/api/v1/health" "backend" 50
   wait_http "http://127.0.0.1:5173/" "frontend" 50
   log "seeding knowledge/sdnu..."
-  (cd "${ROOT}/backend1" && uv run python "${ROOT}/scripts/seed_sdnu_kb.py")
+  export_jwt_from_backend_env
+  (cd "${ROOT}/backend" && uv run python "${ROOT}/scripts/seed_sdnu_kb.py")
   log ""
   log "ready"
   log "  frontend   http://127.0.0.1:5173"
-  log "  backend1   http://127.0.0.1:8001/docs"
-  log "  backend2   http://127.0.0.1:8002/docs"
+  log "  backend    http://127.0.0.1:8000/docs"
   log "  tenant     sdnu-demo"
   log "  logs       ${RUN_DIR}/"
   log "  stop       ${ROOT}/start.sh stop"
-  log "JWT_SECRET must match backend1/.env and backend2/.env (default ${JWT_SECRET_DEFAULT})"
+  log "JWT_SECRET default ${JWT_SECRET_DEFAULT} (set in backend/.env)"
 }
 
 case "${1:-start}" in

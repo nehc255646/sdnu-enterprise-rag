@@ -1,4 +1,4 @@
-import { chatFetch, CHAT_BASE } from './client'
+import { apiFetch, apiUrl } from './client'
 
 export type HealthDependency = {
   name: string
@@ -31,13 +31,13 @@ export type LlmConfigUpdate = {
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
-  const res = await fetch(CHAT_BASE + '/api/v1/health')
+  const res = await fetch(apiUrl('/api/v1/health'))
   if (!res.ok) throw new Error('health ' + res.status)
   return res.json()
 }
 
 export async function fetchLlmConfig(): Promise<LlmConfigResponse> {
-  return (await chatFetch('/api/v1/llm/config')) as LlmConfigResponse
+  return (await apiFetch('/api/v1/llm/config')) as LlmConfigResponse
 }
 
 export async function updateLlmConfig(cfg: LlmConfigUpdate): Promise<LlmConfigResponse> {
@@ -48,7 +48,7 @@ export async function updateLlmConfig(cfg: LlmConfigUpdate): Promise<LlmConfigRe
   if (cfg.api_key !== undefined) {
     body.api_key = cfg.api_key
   }
-  return (await chatFetch('/api/v1/llm/config', {
+  return (await apiFetch('/api/v1/llm/config', {
     method: 'PUT',
     body: JSON.stringify(body),
   })) as LlmConfigResponse

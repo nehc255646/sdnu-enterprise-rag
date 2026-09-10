@@ -19,10 +19,9 @@ Demo 租户：`sdnu-demo`（登录/注册表单默认填这个）。
 
 | 前缀 | 目标 |
 |------|------|
-| `/ingest-api` | `http://127.0.0.1:8001`（ingest 服务） |
-| `/chat-api` | `http://127.0.0.1:8002`（chat 服务） |
+| `/api` | `http://127.0.0.1:8000` |
 
-也可在 `.env` 设置 `VITE_INGEST_API` / `VITE_CHAT_API` 直连。
+也可在 `.env` 设置 `VITE_API` 直连后端。
 
 ## 安全说明
 
