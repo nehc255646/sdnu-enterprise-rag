@@ -47,7 +47,6 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
         title="山师大知识库问答",
-        version="0.1.0",
         description=(
             "Document ingest, tenant-scoped retrieval, JWT auth, sessions, "
             "and LangChain LCEL RAG with SSE citations. "
