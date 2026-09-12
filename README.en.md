@@ -26,7 +26,7 @@ Demo tenant **`sdnu-demo`** · corpus `knowledge/sdnu/` (~**16** documents).
 | Hot-swappable LLM | OpenAI-compatible triple `base_url` / `model` / `api_key` via `GET\|PUT /api/v1/llm/config` — no restart |
 | One-click demo | `docker compose up --build` or `./start.sh` (Postgres + Redis + Qdrant + backend + frontend) |
 | Ragas eval | `backend/evals` + `pytest tests/test_ragas_sample.py` (offline smoke / optional live Ollama) |
-| Rate limit fail-open | Redis chat rate limit (default 60/min); if Redis is down, allow (no 500); over limit → **429** |
+| Rate limit | Redis chat rate limit (default 60/min); if Redis is down, process-local counters (no 500); over limit → **429** |
 
 ## Architecture
 

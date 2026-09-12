@@ -135,17 +135,27 @@ def search(
     return results
 
 
+def _collection_missing(exc: BaseException) -> bool:
+    text = str(exc).lower()
+    return any(s in text for s in ("not found", "doesn't exist", "does not exist", "404", "no such"))
+
+
 def delete_by_document(document_id: str, tenant_id: str, settings: Settings | None = None) -> None:
     settings = settings or get_settings()
     client = get_qdrant()
-    client.delete(
-        collection_name=settings.qdrant_collection,
-        points_selector=qm.FilterSelector(
-            filter=qm.Filter(
-                must=[
-                    qm.FieldCondition(key="tenant_id", match=qm.MatchValue(value=tenant_id)),
-                    qm.FieldCondition(key="document_id", match=qm.MatchValue(value=document_id)),
-                ]
-            )
-        ),
-    )
+    try:
+        client.delete(
+            collection_name=settings.qdrant_collection,
+            points_selector=qm.FilterSelector(
+                filter=qm.Filter(
+                    must=[
+                        qm.FieldCondition(key="tenant_id", match=qm.MatchValue(value=tenant_id)),
+                        qm.FieldCondition(key="document_id", match=qm.MatchValue(value=document_id)),
+                    ]
+                )
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001
+        if _collection_missing(exc):
+            return
+        raise

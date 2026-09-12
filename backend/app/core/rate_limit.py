@@ -64,9 +64,9 @@ def rate_limit_status() -> dict:
     except Exception as exc:  # noqa: BLE001
         return {
             "enabled": True,
-            "backend": "disabled",
-            "ok": False,
-            "detail": f"optional: redis error — rate limit degraded (allow): {exc}",
+            "backend": "local",
+            "ok": True,
+            "detail": f"redis error — process-local limit={settings.rate_limit_chat_per_minute}/min ({exc})",
         }
 
 
@@ -84,13 +84,16 @@ def enforce_chat_rate_limit(user: CurrentUser) -> None:
         )
 
 
-def enforce_auth_rate_limit(request: Request) -> None:
+def enforce_auth_rate_limit(request: Request, *, identity: str | None = None) -> None:
     settings = get_settings()
     if not settings.rate_limit_enabled:
         return
     limit = max(1, int(settings.rate_limit_auth_per_minute))
-    host = request.client.host if request.client else "unknown"
-    key = f"rag:ratelimit:auth:{host}"
+    ident = (identity or "").strip().lower()
+    if not ident:
+        host = request.client.host if request.client else "unknown"
+        ident = f"ip:{host}"
+    key = f"rag:ratelimit:auth:{ident}"
     n = _incr(key, window_seconds=60)
     if n > limit:
         raise HTTPException(

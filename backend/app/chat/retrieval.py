@@ -1,4 +1,4 @@
-"""Tenant-scoped search. tenant_id is taken from the caller, not a forwarded JWT."""
+"""Tenant-scoped search."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ class LocalRetrievalClient(RetrievalClient):
             doc_type=doc_type,
             use_cache=use_cache,
         )
-        return [h for h in hits if h.get("tenant_id") in (None, tenant_id)]
+        return [h for h in hits if h.get("tenant_id") == tenant_id]
 
 
 class InMemoryRetrievalClient(RetrievalClient):

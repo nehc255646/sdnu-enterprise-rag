@@ -103,7 +103,20 @@ def test_missing_auth_401(client: TestClient):
 
 def test_missing_tenant_400(client: TestClient):
     r = client.get("/api/v1/documents", headers={"Authorization": f"Bearer {_token('t')}"})
-    assert r.status_code in (400, 422)
+    assert r.status_code == 400
+
+
+def test_local_client_drops_missing_tenant(monkeypatch):
+    def fake_retrieve(**_kwargs):
+        return [
+            {"tenant_id": "t1", "text": "keep"},
+            {"tenant_id": None, "text": "drop-none"},
+            {"tenant_id": "t2", "text": "drop-other"},
+        ]
+
+    monkeypatch.setattr("app.chat.retrieval.ingest_retrieve", fake_retrieve)
+    hits = LocalRetrievalClient().search(query="x", tenant_id="t1", top_k=5)
+    assert hits == [{"tenant_id": "t1", "text": "keep"}]
 
 
 def test_tenant_mismatch_403(client: TestClient):

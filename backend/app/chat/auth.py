@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.chat.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserOut
@@ -19,7 +20,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(body: RegisterRequest, request: Request, db: Session = Depends(get_db)) -> TokenResponse:
-    enforce_auth_rate_limit(request)
+    email = body.email.lower()
+    enforce_auth_rate_limit(request, identity=f"{body.tenant_id or ''}:{email}")
     raw_tenant = (body.tenant_id or str(uuid.uuid4())).strip()
     try:
         tenant_id = validate_tenant_id(raw_tenant)
@@ -27,7 +29,7 @@ def register(body: RegisterRequest, request: Request, db: Session = Depends(get_
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid tenant_id") from None
     existing = (
         db.query(User)
-        .filter(User.tenant_id == tenant_id, User.email == body.email.lower())
+        .filter(User.tenant_id == tenant_id, User.email == email)
         .one_or_none()
     )
     if existing:
@@ -35,11 +37,15 @@ def register(body: RegisterRequest, request: Request, db: Session = Depends(get_
 
     user = User(
         tenant_id=tenant_id,
-        email=body.email.lower(),
+        email=email,
         hashed_password=hash_password(body.password),
     )
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email already registered for tenant") from None
     db.refresh(user)
 
     token = create_access_token(subject=user.id, tenant_id=user.tenant_id, extra={"email": user.email})
@@ -48,14 +54,15 @@ def register(body: RegisterRequest, request: Request, db: Session = Depends(get_
 
 @router.post("/login", response_model=TokenResponse)
 def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)) -> TokenResponse:
-    enforce_auth_rate_limit(request)
+    email = body.email.lower()
+    enforce_auth_rate_limit(request, identity=f"{body.tenant_id}:{email}")
     try:
         tenant_id = validate_tenant_id(body.tenant_id)
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid tenant_id") from None
     user = (
         db.query(User)
-        .filter(User.tenant_id == tenant_id, User.email == body.email.lower())
+        .filter(User.tenant_id == tenant_id, User.email == email)
         .one_or_none()
     )
     if user is None or not verify_password(body.password, user.hashed_password):

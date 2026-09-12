@@ -6,7 +6,7 @@ FastAPI 入库 / 检索 / 鉴权 / 对话，端口 `8000`。
 backend:
   build: ./backend
   ports:
-    - "8000:8000"
+    - "127.0.0.1:8000:8000"
   environment:
     DATABASE_URL: postgresql+psycopg2://rag:rag@postgres:5432/rag
     REDIS_URL: redis://redis:6379/0

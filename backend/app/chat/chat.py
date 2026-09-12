@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,6 +19,7 @@ from app.core.rate_limit import enforce_chat_rate_limit
 from app.models import ChatMessage, ChatSession, MessageRole
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+logger = logging.getLogger(__name__)
 
 
 def _get_owned_session(db: Session, session_id: str, user: CurrentUser) -> ChatSession:
@@ -150,7 +152,8 @@ async def chat_stream(
                 payload = json.dumps(data, ensure_ascii=False)
                 yield f"event: {etype}\ndata: {payload}\n\n"
         except Exception as exc:  # noqa: BLE001
-            err = json.dumps({"message": str(exc)}, ensure_ascii=False)
+            logger.exception("chat stream failed: %s", exc)
+            err = json.dumps({"message": "chat failed"}, ensure_ascii=False)
             yield f"event: error\ndata: {err}\n\n"
             yield "event: done\ndata: {}\n\n"
         finally:

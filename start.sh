@@ -82,30 +82,64 @@ start_infra() {
   ollama list | grep -q 'qwen2.5:1.5b' || ollama pull qwen2.5:1.5b
 }
 
+kill_port() {
+  local port="$1"
+  if command -v fuser >/dev/null 2>&1; then
+    fuser -k "${port}/tcp" >/dev/null 2>&1 || true
+  fi
+}
+
+spawn_session() {
+  local name="$1" dir="$2"
+  shift 2
+  if command -v setsid >/dev/null 2>&1; then
+    (
+      cd "${dir}" || exit 1
+      exec setsid "$@"
+    ) >"${RUN_DIR}/${name}.log" 2>&1 &
+  else
+    (
+      cd "${dir}" || exit 1
+      exec "$@"
+    ) >"${RUN_DIR}/${name}.log" 2>&1 &
+  fi
+  echo $! >"${RUN_DIR}/${name}.pid"
+}
+
 start_backend() {
   if port_in_use 8000; then
-    log "  backend already on :8000"
-    return 0
+    local pid=""
+    [[ -f "${RUN_DIR}/backend.pid" ]] && pid="$(cat "${RUN_DIR}/backend.pid" || true)"
+    if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+      log "  backend already on :8000"
+      return 0
+    fi
+    log "  freeing leftover :8000"
+    kill_port 8000
+    sleep 0.3
   fi
   if [[ ! -d "${ROOT}/backend/.venv" ]]; then
     (cd "${ROOT}/backend" && uv sync --python 3.12 --extra dev)
   fi
-  nohup bash -lc "cd '${ROOT}/backend' && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload" \
-    >"${RUN_DIR}/backend.log" 2>&1 &
-  echo $! >"${RUN_DIR}/backend.pid"
+  spawn_session backend "${ROOT}/backend" uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 }
 
 start_frontend() {
   if port_in_use 5173; then
-    log "  frontend already on :5173"
-    return 0
+    local pid=""
+    [[ -f "${RUN_DIR}/frontend.pid" ]] && pid="$(cat "${RUN_DIR}/frontend.pid" || true)"
+    if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+      log "  frontend already on :5173"
+      return 0
+    fi
+    log "  freeing leftover :5173"
+    kill_port 5173
+    sleep 0.3
   fi
   if [[ ! -d "${ROOT}/frontend/node_modules" ]]; then
     (cd "${ROOT}/frontend" && npm install)
   fi
-  nohup bash -lc "cd '${ROOT}/frontend' && npm run dev -- --host 127.0.0.1 --port 5173" \
-    >"${RUN_DIR}/frontend.log" 2>&1 &
-  echo $! >"${RUN_DIR}/frontend.pid"
+  spawn_session frontend "${ROOT}/frontend" npm run dev -- --host 127.0.0.1 --port 5173
 }
 
 stop_pidfile() {
@@ -114,9 +148,9 @@ stop_pidfile() {
   local pid
   pid="$(cat "${pidfile}" || true)"
   if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
-    kill "${pid}" 2>/dev/null || true
-    sleep 0.3
-    kill -9 "${pid}" 2>/dev/null || true
+    kill -- "-${pid}" 2>/dev/null || kill "${pid}" 2>/dev/null || true
+    sleep 0.4
+    kill -9 -- "-${pid}" 2>/dev/null || kill -9 "${pid}" 2>/dev/null || true
   fi
   rm -f "${pidfile}"
 }
@@ -175,6 +209,12 @@ cmd_stop() {
   stop_pidfile "${RUN_DIR}/backend.pid"
   stop_pidfile "${RUN_DIR}/backend2.pid"
   stop_pidfile "${RUN_DIR}/backend1.pid"
+  if port_in_use 8000; then
+    kill_port 8000
+  fi
+  if port_in_use 5173; then
+    kill_port 5173
+  fi
   log "stopped app processes and tunnel (Postgres/Qdrant/Redis/Ollama left running)"
 }
 
@@ -202,6 +242,10 @@ cmd_start() {
 }
 
 cmd_tunnel() {
+  export_jwt_from_backend_env
+  if [[ "${JWT_SECRET:-${JWT_SECRET_DEFAULT}}" == "${JWT_SECRET_DEFAULT}" ]]; then
+    log "WARNING: JWT_SECRET is the demo placeholder; the public URL shares that secret."
+  fi
   cmd_start
   ensure_cloudflared
   local bin url pid

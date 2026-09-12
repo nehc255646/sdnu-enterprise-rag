@@ -26,8 +26,8 @@ export default function SettingsPage() {
       setHealth(h)
       setLlm(c)
       form.setFieldsValue({
-        base_url: c.base_url || h.llm_base_url || 'http://127.0.0.1:11434/v1',
-        model: c.model || h.llm_model || '',
+        base_url: c.base_url || 'http://127.0.0.1:11434/v1',
+        model: c.model || '',
         api_key: undefined,
       })
     } catch (e) {
@@ -107,15 +107,15 @@ export default function SettingsPage() {
         extra={<Button icon={<ReloadOutlined />} loading={loading} onClick={() => void refresh()}>刷新</Button>}
       >
         <Typography.Paragraph type="secondary">
-          OpenAI 兼容接口：`base_url` / `api_key` / `model`。`api_key` 留空不提交=保持原值；提交空串=清成 `sk-no-auth`。
+          OpenAI 兼容接口：`base_url` / `api_key` / `model`。`api_key` 留空不提交=保持原值；提交空串=清成 `sk-no-auth`。私网 / Docker 服务名不可作为 base_url。
         </Typography.Paragraph>
 
         <Descriptions size="small" column={1} bordered style={{ marginBottom: 16 }}>
           <Descriptions.Item label="health">
             {health ? <Tag color={health.status === 'ok' ? 'success' : 'warning'}>{health.status}</Tag> : '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="llm_base_url">{health?.llm_base_url || llm?.base_url || '-'}</Descriptions.Item>
-          <Descriptions.Item label="llm_model">{health?.llm_model || llm?.model || '-'}</Descriptions.Item>
+          <Descriptions.Item label="llm_base_url">{llm?.base_url || '-'}</Descriptions.Item>
+          <Descriptions.Item label="llm_model">{llm?.model || '-'}</Descriptions.Item>
           <Descriptions.Item label="api_key_set">
             {llm ? (llm.api_key_set ? <Tag color="blue">已设置</Tag> : <Tag>sk-no-auth / 空</Tag>) : '-'}
           </Descriptions.Item>
@@ -147,7 +147,7 @@ export default function SettingsPage() {
             <Input placeholder="qwen2.5:3b" />
           </Form.Item>
           <Space>
-            <Button type="primary" htmlType="submit" loading={saving}>应用并刷新 health</Button>
+            <Button type="primary" htmlType="submit" loading={saving}>应用配置</Button>
             <Button
               loading={saving}
               onClick={() => {

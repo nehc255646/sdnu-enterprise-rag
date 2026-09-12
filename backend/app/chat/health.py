@@ -5,7 +5,6 @@ from __future__ import annotations
 from fastapi import APIRouter
 from sqlalchemy import text
 
-from app.chat.llm_runtime import get_llm_config
 from app.chat.schemas.health import DependencyStatus, HealthResponse
 from app.core.cache import get_redis
 from app.core.config import get_settings
@@ -75,14 +74,7 @@ def health() -> HealthResponse:
     except Exception as exc:  # noqa: BLE001
         deps.append(DependencyStatus(name="qdrant", ok=False, detail=str(exc)))
 
-    llm_cfg = get_llm_config()
-    deps.append(
-        DependencyStatus(
-            name="llm_config",
-            ok=True,
-            detail=f"base={llm_cfg.base_url} model={llm_cfg.model}",
-        )
-    )
+    deps.append(DependencyStatus(name="llm_config", ok=True, detail="see GET /api/v1/llm/config"))
 
     db_ok = any(d.ok for d in deps if d.name == "database")
     required = [d for d in deps if not d.optional]
@@ -98,7 +90,5 @@ def health() -> HealthResponse:
         dependencies=deps,
         embedding_provider=settings.embedding_provider,
         embedding_model=_embedding_model_label(settings),
-        llm_base_url=llm_cfg.base_url,
-        llm_model=llm_cfg.model,
         retrieval_backend="local",
     )

@@ -148,7 +148,10 @@ async def create_ingest(
         )
 
     if settings.ingest_use_worker:
-        enqueue_ingest({"document_id": doc_id, "tenant_id": tenant_id})
+        try:
+            enqueue_ingest({"document_id": doc_id, "tenant_id": tenant_id})
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail="ingest queue unavailable") from exc
     else:
         background_tasks.add_task(_bg_process, doc_id)
     return IngestCreateResponse(document_id=doc_id, status="pending", message="ingest job queued")

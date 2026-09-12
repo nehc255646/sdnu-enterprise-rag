@@ -23,7 +23,7 @@ class CurrentUser:
 
 
 def require_tenant_header(
-    x_tenant_id: Annotated[str, Header(alias="X-Tenant-Id", description="Tenant id (required)")],
+    x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id", description="Tenant id (required)")] = None,
 ) -> str:
     if x_tenant_id is None or not str(x_tenant_id).strip():
         raise HTTPException(status_code=400, detail="X-Tenant-Id header required")
@@ -56,7 +56,7 @@ def require_tenant(
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: Session = Depends(get_db),
-    x_tenant_id: str = Header(..., alias="X-Tenant-Id"),
+    x_tenant_id: str = Depends(require_tenant_header),
 ) -> CurrentUser:
     """JWT + matching tenant + existing users row (chat / sessions / llm)."""
     if credentials is None or not credentials.credentials:
@@ -71,12 +71,7 @@ def get_current_user(
     if not user_id or not tenant_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="token missing sub/tenant_id")
 
-    if not x_tenant_id or not str(x_tenant_id).strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="X-Tenant-Id header required",
-        )
-    if x_tenant_id.strip() != tenant_id:
+    if x_tenant_id != tenant_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="X-Tenant-Id does not match token tenant",

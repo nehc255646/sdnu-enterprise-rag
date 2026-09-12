@@ -26,7 +26,7 @@ English: [README.en.md](./README.en.md)
 | LLM 热切换 | OpenAI 兼容三元组 `base_url` / `model` / `api_key`，`GET\|PUT /api/v1/llm/config` 运行时切换，无需重启 |
 | 一键演示 | `docker compose up --build` 或 `./start.sh`（Postgres + Redis + Qdrant + 后端 + 前端） |
 | Ragas 评测 | `backend/evals` + `pytest tests/test_ragas_sample.py`（离线 smoke / 可选 live Ollama） |
-| 限流 fail-open | Redis 聊天限流（默认 60/min）；Redis 不可达时放行不 500；超限 → **429** |
+| 限流 | Redis 聊天限流（默认 60/min）；Redis 不可达时改用进程内计数，不 500；超限 → **429** |
 
 ## 架构
 

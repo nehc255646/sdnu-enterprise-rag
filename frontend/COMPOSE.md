@@ -11,7 +11,7 @@
 frontend:
   build: ./frontend
   ports:
-    - "5173:80"   # 或 "80:80"
+    - "127.0.0.1:5173:80"   # 或 "127.0.0.1:80:80"
   depends_on:
     - backend
 ```

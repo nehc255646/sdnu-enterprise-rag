@@ -70,7 +70,7 @@ def retrieve(
 
     if client is not None:
         try:
-            client.setex(key, 300, json.dumps(results, ensure_ascii=False))
+            client.setex(key, settings.redis_cache_ttl_seconds, json.dumps(results, ensure_ascii=False))
         except Exception as exc:  # noqa: BLE001
             logger.warning("cache write failed: %s", exc)
     return results

@@ -80,10 +80,7 @@ def process_document(db: Session, document_id: str) -> None:
         if not texts:
             raise ValueError("no text extracted from document")
 
-        try:
-            delete_by_document(doc.id, doc.tenant_id)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("qdrant delete skipped: %s", exc)
+        delete_by_document(doc.id, doc.tenant_id)
 
         embeddings = get_embeddings()
         vectors = embeddings.embed_documents(texts)

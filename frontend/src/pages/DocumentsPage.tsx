@@ -37,8 +37,8 @@ export default function DocumentsPage() {
   const [page, setPage] = useState(1)
   const pageSize = 50
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
+  const refresh = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true)
     try {
       const data = await listDocuments({
         doc_type: docType,
@@ -48,13 +48,20 @@ export default function DocumentsPage() {
       setItems(data.items || [])
       setTotal(data.total || 0)
     } catch (e) {
-      message.error(e instanceof Error ? e.message : '加载失败')
+      if (!opts?.silent) message.error(e instanceof Error ? e.message : '加载失败')
     } finally {
-      setLoading(false)
+      if (!opts?.silent) setLoading(false)
     }
   }, [docType, page])
 
   useEffect(() => { void refresh() }, [refresh])
+
+  useEffect(() => {
+    const busy = items.some((row) => row.status === 'pending' || row.status === 'processing')
+    if (!busy) return
+    const timer = window.setInterval(() => { void refresh({ silent: true }) }, 2000)
+    return () => window.clearInterval(timer)
+  }, [items, refresh])
 
   const columns: ColumnsType<DocumentListItem> = [
     {
@@ -80,9 +87,23 @@ export default function DocumentsPage() {
       dataIndex: 'status',
       key: 'status',
       width: 110,
-      render: (s: string) => {
+      render: (s: string, row) => {
         const meta = statusMeta[s] || { color: 'default', label: s }
-        return <Tag color={meta.color}>{meta.label}</Tag>
+        return (
+          <Tag color={meta.color} title={row.error_message || undefined}>
+            {meta.label}
+          </Tag>
+        )
+      },
+    },
+    {
+      title: '说明',
+      dataIndex: 'error_message',
+      key: 'error_message',
+      ellipsis: true,
+      render: (msg?: string | null, row?: DocumentListItem) => {
+        if (row?.status !== 'failed') return '—'
+        return msg || '入库失败'
       },
     },
     { title: '分块', dataIndex: 'chunk_count', key: 'chunk_count', width: 80 },
@@ -134,9 +155,6 @@ export default function DocumentsPage() {
                   message.error(res.message || '入库失败')
                 } else {
                   message.success(sync ? '上传并同步入库成功' : '已提交异步入库，稍后刷新查看状态')
-                }
-                if (!sync && res?.document_id) {
-                  setTimeout(() => { void refresh() }, 1500)
                 }
                 await refresh()
               } catch (e) {

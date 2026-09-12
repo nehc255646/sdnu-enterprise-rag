@@ -7,9 +7,7 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
-from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 
 from app.chat.retrieval import RetrievalClient, get_retrieval_client
 from app.chat.schemas.chat import Citation
@@ -84,61 +82,13 @@ def get_llm(tenant_id: str | None = None):
     )
 
 
-def build_rag_chain(
-    retrieval: RetrievalClient | None = None,
-    tenant_id: str | None = None,
-    top_k: int = 5,
-):
-    """Build LCEL chain. tenant_id is baked in via closure for safe retrieval."""
-    if not tenant_id:
-        raise ValueError("tenant_id required to build RAG chain")
-    client = retrieval or get_retrieval_client()
-
-    def retrieve_fn(question: str) -> list[dict[str, Any]]:
-        return client.search(
-            query=question,
-            tenant_id=tenant_id,
-            top_k=top_k,
-        )
-
-    try:
-        llm = get_llm(tenant_id)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("LLM init failed: %s", exc)
-        llm = None
-
-    if llm is None:
-        def fallback(inputs: dict[str, Any]) -> str:
-            docs = retrieve_fn(inputs["question"])
-            if not docs:
-                return "No relevant documents found for your tenant. (LLM not configured)"
-            citations = hits_to_citations(docs)
-            lines = ["Retrieved context (LLM not configured — showing top snippets):"]
-            for c in citations:
-                lines.append(f"- {c.filename or c.document_id}: {c.text[:200]}")
-            return "\n".join(lines)
-
-        return RunnableLambda(fallback)
-
-    chain = (
-        {
-            "docs": RunnableLambda(lambda x: retrieve_fn(x["question"])),
-            "question": RunnablePassthrough() | RunnableLambda(lambda x: x["question"] if isinstance(x, dict) else x),
-        }
-        | RunnableLambda(
-            lambda x: {
-                "context": _format_docs(x["docs"]),
-                "history": "(none)",
-                "question": x["question"] if isinstance(x["question"], str) else x["question"].get("question", ""),
-                "docs": x["docs"],
-            }
-        )
-        | {
-            "answer": PROMPT | llm | StrOutputParser(),
-            "docs": RunnableLambda(lambda x: x["docs"]),
-        }
-    )
-    return chain
+def _snippet_fallback(citations: list[Citation], *, empty: bool) -> str:
+    if empty:
+        return "No relevant documents found for your tenant. The language model is unavailable."
+    lines = ["The language model is unavailable. Showing top retrieved snippets:"]
+    for c in citations:
+        lines.append(f"- {c.filename or c.document_id}: {c.text[:200]}")
+    return "\n".join(lines)
 
 
 def run_rag(
@@ -152,7 +102,11 @@ def run_rag(
     settings = get_settings()
     k = top_k or settings.rag_top_k
     client = retrieval or get_retrieval_client()
-    hits = client.search(query=question, tenant_id=tenant_id, top_k=k)
+    try:
+        hits = client.search(query=question, tenant_id=tenant_id, top_k=k)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("retrieval failed: %s", exc)
+        return "Retrieval failed. Try again later.", []
     citations = hits_to_citations(hits)
     prompt_inputs = {
         "context": _format_docs(hits),
@@ -169,14 +123,7 @@ def run_rag(
         return answer, citations
     except Exception as exc:  # noqa: BLE001
         logger.warning("LLM invoke failed (%s); returning retrieval snippets", exc)
-        if not hits:
-            answer = f"No relevant documents found for your tenant. (LLM unavailable: {exc})"
-        else:
-            answer = (
-                f"Retrieved context (LLM unavailable: {exc} — showing top snippets):\n"
-                + "\n".join(f"- {c.filename or c.document_id}: {c.text[:200]}" for c in citations)
-            )
-        return answer, citations
+        return _snippet_fallback(citations, empty=not hits), citations
 
 
 async def stream_rag(
@@ -194,7 +141,8 @@ async def stream_rag(
     try:
         hits = client.search(query=question, tenant_id=tenant_id, top_k=k)
     except Exception as exc:  # noqa: BLE001
-        yield {"event": "error", "data": {"message": f"retrieval failed: {exc}"}}
+        logger.warning("retrieval failed: %s", exc)
+        yield {"event": "error", "data": {"message": "retrieval failed"}}
         yield {"event": "done", "data": {}}
         return
 
@@ -223,13 +171,7 @@ async def stream_rag(
         yield {"event": "done", "data": {"answer": "".join(answer_parts)}}
     except Exception as exc:  # noqa: BLE001
         logger.warning("LLM stream failed (%s); falling back to snippets", exc)
-        if not hits:
-            text = f"No relevant documents found for your tenant. (LLM unavailable: {exc})"
-        else:
-            text = (
-                f"Retrieved context (LLM unavailable: {exc}):\n"
-                + "\n".join(f"- {c.filename or c.document_id}: {c.text[:200]}" for c in citations)
-            )
+        text = _snippet_fallback(citations, empty=not hits)
         for ch in text:
             yield {"event": "token", "data": {"token": ch}}
         yield {"event": "done", "data": {"answer": text}}

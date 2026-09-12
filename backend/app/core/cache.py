@@ -13,21 +13,19 @@ logger = logging.getLogger(__name__)
 @lru_cache
 def _redis_client():
     settings = get_settings()
-    try:
-        import redis
+    import redis
 
-        client = redis.from_url(settings.redis_url, decode_responses=True, socket_connect_timeout=1)
-        client.ping()
-        return client
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Redis unavailable: %s", exc)
-        return None
+    client = redis.from_url(settings.redis_url, decode_responses=True, socket_connect_timeout=1)
+    client.ping()
+    return client
 
 
 def get_redis():
     try:
         return _redis_client()
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Redis unavailable: %s", exc)
+        _redis_client.cache_clear()
         return None
 
 
