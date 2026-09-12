@@ -66,6 +66,7 @@ docker compose up -d --build
 
 ```bash
 ./start.sh          # Postgres + Qdrant (Docker) + host Redis / Ollama + backend + frontend
+./start.sh tunnel   # same, plus a temporary HTTPS public URL for :5173 (Cloudflare quick tunnel)
 ./start.sh stop
 ```
 

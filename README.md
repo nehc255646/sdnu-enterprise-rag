@@ -66,6 +66,7 @@ docker compose up -d --build
 
 ```bash
 ./start.sh          # Postgres + Qdrant（Docker）+ 本机 Redis / Ollama + 后端 + 前端；缺语料时灌入 knowledge/sdnu
+./start.sh tunnel   # 同上，并把 :5173 转到临时 HTTPS 公网地址（Cloudflare quick tunnel）
 ./start.sh stop
 ```
 

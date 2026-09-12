@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # 本机开发一键启动 / 停止：Postgres+Qdrant（Docker）、本机 Redis、Ollama、后端、前端。
+# tunnel：把前端 :5173 转到临时 HTTPS 公网地址（仅转发本机端口，不暴露数据库 / Ollama）。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_DIR="${ROOT}/.run"
 JWT_SECRET_DEFAULT="change-me-to-a-long-random-string"
+CLOUDFLARED_RELEASE="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
 
 mkdir -p "${RUN_DIR}"
 
@@ -21,10 +23,10 @@ port_in_use() {
 }
 
 wait_http() {
-  local url="$1" name="$2" tries="${3:-40}"
+  local url="$1" name="$2" tries="${3:-40}" maxt="${4:-2}"
   local i
   for i in $(seq 1 "${tries}"); do
-    if curl -fsS -o /dev/null --max-time 2 "${url}" 2>/dev/null; then
+    if curl -fsS -o /dev/null --max-time "${maxt}" "${url}" 2>/dev/null; then
       log "  ${name} ready"
       return 0
     fi
@@ -119,12 +121,61 @@ stop_pidfile() {
   rm -f "${pidfile}"
 }
 
+cloudflared_bin() {
+  if command -v cloudflared >/dev/null 2>&1; then
+    command -v cloudflared
+    return 0
+  fi
+  if [[ -x "${RUN_DIR}/cloudflared" ]]; then
+    printf '%s\n' "${RUN_DIR}/cloudflared"
+    return 0
+  fi
+  return 1
+}
+
+ensure_cloudflared() {
+  if cloudflared_bin >/dev/null; then
+    return 0
+  fi
+  command -v curl >/dev/null 2>&1 || die "curl not found (needed to download cloudflared)"
+  log "  downloading cloudflared..."
+  curl -fsSL -o "${RUN_DIR}/cloudflared" "${CLOUDFLARED_RELEASE}"
+  chmod +x "${RUN_DIR}/cloudflared"
+  "${RUN_DIR}/cloudflared" --version >/dev/null || die "cloudflared download failed"
+}
+
+read_tunnel_url() {
+  [[ -f "${RUN_DIR}/tunnel.log" ]] || return 1
+  grep -oE 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' "${RUN_DIR}/tunnel.log" | tail -n 1
+}
+
+wait_tunnel_url() {
+  local tries="${1:-60}" i url pid
+  for i in $(seq 1 "${tries}"); do
+    url="$(read_tunnel_url || true)"
+    if [[ -n "${url}" ]]; then
+      printf '%s\n' "${url}"
+      return 0
+    fi
+    if [[ -f "${RUN_DIR}/tunnel.pid" ]]; then
+      pid="$(cat "${RUN_DIR}/tunnel.pid" || true)"
+      if [[ -n "${pid}" ]] && ! kill -0 "${pid}" 2>/dev/null; then
+        die "cloudflared exited; see ${RUN_DIR}/tunnel.log"
+      fi
+    fi
+    sleep 0.5
+  done
+  die "tunnel URL not found; see ${RUN_DIR}/tunnel.log"
+}
+
 cmd_stop() {
+  stop_pidfile "${RUN_DIR}/tunnel.pid"
+  rm -f "${RUN_DIR}/tunnel.url"
   stop_pidfile "${RUN_DIR}/frontend.pid"
   stop_pidfile "${RUN_DIR}/backend.pid"
   stop_pidfile "${RUN_DIR}/backend2.pid"
   stop_pidfile "${RUN_DIR}/backend1.pid"
-  log "stopped app processes (Postgres/Qdrant/Redis/Ollama left running)"
+  log "stopped app processes and tunnel (Postgres/Qdrant/Redis/Ollama left running)"
 }
 
 cmd_start() {
@@ -146,12 +197,48 @@ cmd_start() {
   log "  tenant     sdnu-demo"
   log "  logs       ${RUN_DIR}/"
   log "  stop       ${ROOT}/start.sh stop"
+  log "  public     ${ROOT}/start.sh tunnel"
   log "JWT_SECRET default ${JWT_SECRET_DEFAULT} (set in backend/.env)"
+}
+
+cmd_tunnel() {
+  cmd_start
+  ensure_cloudflared
+  local bin url pid
+  bin="$(cloudflared_bin)" || die "cloudflared not found"
+  if [[ -f "${RUN_DIR}/tunnel.pid" ]]; then
+    pid="$(cat "${RUN_DIR}/tunnel.pid" || true)"
+    if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+      url="$(read_tunnel_url || true)"
+      if [[ -n "${url}" ]]; then
+        printf '%s\n' "${url}" >"${RUN_DIR}/tunnel.url"
+        log "tunnel already running"
+        log "  public     ${url}"
+        log "  local      http://127.0.0.1:5173"
+        log "  stop       ${ROOT}/start.sh stop"
+        return 0
+      fi
+    fi
+  fi
+  : >"${RUN_DIR}/tunnel.log"
+  nohup "${bin}" tunnel --url http://127.0.0.1:5173 --no-autoupdate \
+    >"${RUN_DIR}/tunnel.log" 2>&1 &
+  echo $! >"${RUN_DIR}/tunnel.pid"
+  log "waiting for public URL..."
+  url="$(wait_tunnel_url 80)"
+  printf '%s\n' "${url}" >"${RUN_DIR}/tunnel.url"
+  wait_http "${url}" "public tunnel" 40 10
+  log ""
+  log "ready (temporary public HTTPS; URL changes each start)"
+  log "  public     ${url}"
+  log "  local      http://127.0.0.1:5173"
+  log "  stop       ${ROOT}/start.sh stop"
 }
 
 case "${1:-start}" in
   start) cmd_start ;;
   stop) cmd_stop ;;
   restart) cmd_stop; cmd_start ;;
-  *) die "usage: $0 [start|stop|restart]" ;;
+  tunnel) cmd_tunnel ;;
+  *) die "usage: $0 [start|stop|restart|tunnel]" ;;
 esac
